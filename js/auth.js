@@ -77,9 +77,9 @@
   // 跳过改密
   const skip = document.getElementById("skipChpwd");
   if (skip) {
-    skip.addEventListener("click", (e) => {
+    skip.addEventListener("click", async (e) => {
       e.preventDefault();
-      STORE.skipPasswordChange();
+      await STORE.skipPasswordChange();
       goAfterLogin();
     });
   }

@@ -713,14 +713,14 @@ const STORE = (function () {
     u.password = await hashPassword(newPwd); // 只存哈希
     u.mustChange = false;
     saveUsers(users);
-    pushMe({ password: u.password, mustChange: false });
+    await pushMe({ password: u.password, mustChange: false }); // 等待服务端落库，避免关页即丢失
     s.mustChange = false;
     lsSet(KEY.session, s);
     return { ok: true };
   }
 
   // 跳过首次改密（保留原密码，仅清除强制标记）
-  function skipPasswordChange() {
+  async function skipPasswordChange() {
     const s = getSession();
     if (!s) return { ok: false, msg: "未登录" };
     const users = getUsers();
@@ -728,7 +728,7 @@ const STORE = (function () {
     if (!u) return { ok: false, msg: "用户不存在" };
     u.mustChange = false;
     saveUsers(users);
-    pushMe({ mustChange: false });
+    await pushMe({ mustChange: false }); // 等待服务端清除强制改密标记
     s.mustChange = false;
     lsSet(KEY.session, s);
     return { ok: true };
