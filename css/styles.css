@@ -675,3 +675,111 @@ img { max-width: 100%; display: block; }
   .article { padding:28px 22px; }
   .brand-sub { display:none; }
 }
+
+/* ==========================================================================
+   移动端深度适配（平板 / 手机 / 折叠屏 · macOS 观感）
+   大部分访问来自手机端：iOS / HarmonyOS / Android，需极致体验。
+   ========================================================================== */
+:root {
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --sar: env(safe-area-inset-right);
+}
+
+/* ---- 触控设备通用：目标 ≥ 44px，禁止长按菜单/双击缩放 ---- */
+@media (hover: none), (pointer: coarse) {
+  a, button, .btn, .quick-link, .filter-chip, .nav-toggle, input, select, textarea { touch-action: manipulation; }
+  button, .btn { min-height: 44px; }
+  .main-nav a { padding-top: 14px; padding-bottom: 14px; }
+  /* 防 iOS/iPad 聚焦时自动放大页面 */
+  input[type="text"], input[type="password"], input[type="number"], input[type="tel"], input[type="search"], select, textarea { font-size: 16px; }
+}
+
+/* ---- 刘海屏 / 挖孔屏安全区 ---- */
+.site-header { padding-top: var(--sat); }
+.site-header .header-inner { min-height: calc(66px + var(--sat)); }
+.site-footer { padding-bottom: calc(34px + var(--sab)); }
+.auth-wrap { padding-top: var(--sat); }
+.nav-toggle { margin-right: var(--sar); }
+.header-inner { padding-left: max(var(--gutter), var(--sal)); padding-right: max(var(--gutter), var(--sar)); }
+.footer-grid, .footer-bottom { padding-left: max(0px, var(--sal)); padding-right: max(0px, var(--sar)); }
+
+/* 触控层任何卡片不得意外缩放文字造成误读 */
+h1, h2, h3, h4, p, li, blockquote, td, th, span, div { -webkit-text-size-adjust: 100%; }
+
+@media (max-width:960px) {
+  html, body { overflow-x: hidden; }
+  .container { padding-left: max(18px, var(--sal)); padding-right: max(18px, var(--sar)); }
+
+  /* 顶部栏瘦身：logo 小一点、间距收紧 */
+  .site-header .header-inner { gap: 12px; }
+  .brand-mark { width: 36px; height: 36px; }
+  .brand-name { font-size: 19px; }
+  .user-strip { display: flex; }
+
+  /* 字号按屏宽伸缩 */
+  .hero-title { font-size: clamp(34px, 8.5vw, 64px); }
+  .section-title { font-size: clamp(24px, 5.6vw, 42px); }
+  .motto { padding: 40px 20px; border-radius: 24px; }
+  .motto h2 { font-size: clamp(22px, 6vw, 40px); }
+  .motto p { font-size: 14.5px; }
+
+  /* 标签页 / 筛选条：允许横向滑动不换行 */
+  .tab-bar, .admin-tabs, .filter-chips, .leader-tabs, .people-tabs { display:flex; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .tab-bar::-webkit-scrollbar, .admin-tabs::-webkit-scrollbar, .filter-chips::-webkit-scrollbar { display:none; }
+  .tab-bar button, .admin-tabs button, .filter-chip, .leader-tabs button { flex:0 0 auto; white-space:nowrap; }
+
+  /* 用户条在手机上只保留最重要的链接，去掉昵称/角色占宽 */
+  .user-strip .us-name, .user-strip .us-role { display:none; }
+  .user-strip { gap: 6px; }
+  .us-item { padding: 6px 9px; font-size: 12.5px; }
+}
+
+@media (max-width:600px) {
+  /* 平板→手机：网格再降列 */
+  .people-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .section { padding: 42px 0; }
+  .quick-links, .info-cards { grid-template-columns: repeat(2, 1fr); }
+  .work-grid { grid-template-columns: 1fr 1fr; }
+  .news-grid { grid-template-columns: 1fr 1fr; }
+  /* 相册用自适应列，手机上 2~3 列不拥挤 */
+  .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+  .gallery-item .gi-cap { font-size: 12px; }
+
+  /* 首页行动按钮整幅铺开 */
+  .hero-actions { flex-direction: column; width: 100%; }
+  .hero-actions .btn { width: 100%; justify-content: center; }
+
+  /* 相册灯箱触控友好 */
+  .lightbox .lb-stage { padding: 48px 10px 20px; }
+  .lightbox .lb-img { object-fit: contain; }
+  .lb-nav { width: 42px; height: 42px; font-size: 20px; }
+  .lb-nav.lb-prev { left: 8px; }
+  .lb-nav.lb-next { right: 8px; }
+  .lb-cap { padding: 0 8px 8px; text-align:center; }
+
+  /* 表格在卡片内允许横向滑动（数据页） */
+  .data-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; white-space:nowrap; }
+  .data-table table, .tbl table { min-width: 540px; }
+  .rank-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .rank-table { min-width: 640px; }
+  .admin-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; white-space:nowrap; }
+
+  /* 页脚反馈条堆叠 */
+  .feedback-inner { flex-direction: column; align-items: flex-start; }
+  .fb-github { width: 100%; text-align: center; }
+
+  /* 卡片留白收紧，一屏看更多 */
+  .panel { padding: 18px 16px; border-radius: 18px; }
+  .card, .redeem-item, .shop-item { border-radius: 16px; }
+  .article { padding: 24px 18px; }
+}
+
+/* ---- 折叠屏（宽但矮）与超大平板：中屏微调 ---- */
+@media (min-width: 601px) and (max-width: 900px) {
+  .people-grid { grid-template-columns: repeat(3, 1fr); }
+  .gallery-grid { grid-template-columns: repeat(3, 1fr); }
+  .news-grid, .work-grid { grid-template-columns: repeat(2, 1fr); }
+}

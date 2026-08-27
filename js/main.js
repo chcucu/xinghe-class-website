@@ -6,13 +6,20 @@
 const navToggle = document.getElementById("navToggle");
 const mainNav = document.getElementById("mainNav");
 if (navToggle && mainNav) {
+  const setNav = (open) => {
+    mainNav.classList.toggle("open", open);
+    document.body.style.overflow = open ? "hidden" : "";
+  };
   navToggle.addEventListener("click", () => {
-    mainNav.classList.toggle("open");
+    setNav(!mainNav.classList.contains("open"));
   });
-  // 点击导航项后关闭
-  mainNav.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => mainNav.classList.remove("open"));
+  // 点击导航项 / 空白处 / Esc 后关闭，并恢复滚动
+  const closeNav = () => setNav(false);
+  mainNav.querySelectorAll("a").forEach((a) => a.addEventListener("click", closeNav));
+  document.addEventListener("click", (e) => {
+    if (mainNav.classList.contains("open") && !mainNav.contains(e.target) && e.target !== navToggle && !navToggle.contains(e.target)) closeNav();
   });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeNav(); });
 }
 
 /* ---- 顶部阴影（滚动时） ---- */
@@ -150,4 +157,17 @@ if (lightbox && galleryItems.length) {
     if (e.key === "ArrowLeft") show(idx - 1);
     if (e.key === "ArrowRight") show(idx + 1);
   });
+
+  // 移动端：左右滑动切换照片
+  let tx = 0, ty = 0;
+  lightbox.addEventListener("touchstart", (e) => {
+    tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+  }, { passive: true });
+  lightbox.addEventListener("touchend", (e) => {
+    if (!lightbox.classList.contains("open")) return;
+    const dx = e.changedTouches[0].clientX - tx;
+    const dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.4) return; // 忽略点击/纵向滑动
+    show(dx < 0 ? idx + 1 : idx - 1);
+  }, { passive: true });
 }
