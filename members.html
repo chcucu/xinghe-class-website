@@ -148,20 +148,23 @@
       </div>
       <div class="footer-bottom">
         <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
-        <span>星聚成河 · 逐光而行</span>
+        <span>博学笃行，逐梦星河</span>
       </div>
     </div>
   </footer>
 
   <script src="js/store.js"></script>
   <script src="js/guard.js"></script>
+  <script src="js/site.js"></script>
   <script>
     (async function () {
       await STORE.ensureSeeded();
       const grid = document.getElementById("classmatesGrid");
       if (!grid) return;
       const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-      const students = STORE.getUsers().filter((u) => u.role === "student" || u.role === "superadmin");
+      const students = STORE.getUsers()
+        .filter((u) => u.role === "student" || u.role === "superadmin")
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "zh"));
       grid.innerHTML = students.map((u, i) => {
         const display = STORE.displayName(u);
         const initial = (display || "星").charAt(0);

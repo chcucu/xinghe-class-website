@@ -317,7 +317,7 @@
       host.className = "tp-host";
       wrap.appendChild(host);
       var builder = BUILDERS[key];
-      current = builder(host, function (v) { done = v; });
+      current = builder(host, function (v) { done = v; if (v && window.showToast) window.showToast("人机验证通过", "success"); });
       current._host = host;
     }
 

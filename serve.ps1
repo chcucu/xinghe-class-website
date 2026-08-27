@@ -29,9 +29,16 @@ while ($listener.IsListening) {
         ".js"   { "application/javascript; charset=utf-8" }
         ".png"  { "image/png" }
         ".jpg" { "image/jpeg" }
+        ".jpeg" { "image/jpeg" }
+        ".webp" { "image/webp" }
+        ".gif"  { "image/gif" }
         ".pdf"  { "application/pdf" }
         ".svg"  { "image/svg+xml" }
         ".ico"  { "image/x-icon" }
+        ".ttf"  { "font/ttf" }
+        ".woff" { "font/woff" }
+        ".woff2" { "font/woff2" }
+        ".json" { "application/json; charset=utf-8" }
         default { "application/octet-stream" }
       }
       $bytes = [System.IO.File]::ReadAllBytes($full)

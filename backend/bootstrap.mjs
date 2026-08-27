@@ -71,7 +71,7 @@ const docs = {
   groups,
   ledger: [], redeems: [], news: [], media: [], reports: [], cases: [],
   articles: [], meds: [], notices: [], duty: [], wall: [], votes: [], stars: [],
-  wishes: [], signups: [], licenses: [], products: [], treasury: [], orders: [],
+  wishes: [], signups: [], licenses: [], products: [], orders: [],
   albums: [{ id: uid("alb"), name: "班级风采掠影", author: "系统", createdTs: now(), photos, status: "published" }],
   meta: { lastUpdate: now(), lastOperator: "系统初始化" },
 };

@@ -49,6 +49,7 @@
 
   <script src="js/store.js"></script>
   <script src="js/pwview.js"></script>
+  <script src="js/toast.js"></script>
   <script src="js/textpick.js"></script>
   <script>
   (async function () {
@@ -67,7 +68,9 @@
 
     // 家长：加载可选孩子（学生/超管同学）
     if (isParent) {
-      const students = STORE.getUsers().filter((u) => u.role === "student" || u.role === "superadmin");
+      const students = STORE.getUsers()
+        .filter((u) => u.role === "student" || u.role === "superadmin")
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "zh"));
       document.getElementById("childField").style.display = "";
       document.getElementById("studentId").innerHTML =
         '<option value="">请选择您的孩子</option>' +

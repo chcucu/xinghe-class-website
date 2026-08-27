@@ -153,13 +153,14 @@
       </div>
       <div class="footer-bottom">
         <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
-        <span>星聚成河 · 逐光而行</span>
+        <span>博学笃行，逐梦星河</span>
       </div>
     </div>
   </footer>
 
   <script src="js/store.js"></script>
   <script src="js/pwview.js"></script>
+  <script src="js/toast.js"></script>
   <script src="js/guard.js"></script>
   <script src="js/main.js"></script>
   <script src="js/site.js"></script>
@@ -242,8 +243,8 @@
     renderImgs();
 
     // 保存联系方式+简介
-    document.getElementById("btnSaveContact").addEventListener("click", () => {
-      const r = STORE.updateProfile({
+    document.getElementById("btnSaveContact").addEventListener("click", async () => {
+      const r = await STORE.updateProfile({
         contact: {
           qq: document.getElementById("ctQQ").value.trim(),
           email: document.getElementById("ctEmail").value.trim(),
@@ -251,7 +252,8 @@
         },
         bio: document.getElementById("bioInput").value,
       });
-      alert(r.ok ? "已保存" : (r.msg || "保存失败"));
+      if (r.ok) { window.showToast("联系方式已保存", "success"); }
+      else { window.showToast(r.msg || "保存失败", "error"); }
     });
 
     // 头像上传

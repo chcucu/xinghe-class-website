@@ -68,11 +68,19 @@
       </div>
     </section>
 
-    <!-- 匿名举报（仅纪检部） -->
+    <!-- 实名 / 匿名举报（仅纪检部） -->
     <section id="reportSec" style="display:none;">
       <div class="panel" style="margin-top:34px;">
-        <h3>匿名举报</h3>
-        <p style="font-size:13px;color:var(--text-soft);margin-bottom:14px;">如需向纪检部反映问题，可在此匿名提交。仅纪检部成员可见，你的身份不会被泄露。</p>
+        <h3>举报</h3>
+        <p style="font-size:13px;color:var(--text-soft);margin-bottom:14px;">如需向纪检部反映问题，可选择实名或匿名提交。仅纪检部成员可见。</p>
+        <div class="field">
+          <label>举报方式</label>
+          <div class="admin-tabs" id="repMode">
+            <button type="button" data-mode="anon" class="active">匿名举报</button>
+            <button type="button" data-mode="real">实名举报</button>
+          </div>
+          <p class="hint" id="repModeHint" style="font-size:12px;color:var(--muted);margin-top:6px;">匿名：不会记录你的身份；纪检成员仅能看到举报内容。</p>
+        </div>
         <div class="field"><label>涉案人员</label><input class="mini" id="repTarget" placeholder="可选" style="width:100%;"></div>
         <div class="field"><label>案情经过</label><textarea class="mini" id="repDetail" placeholder="请描述经过"></textarea></div>
         <div class="field"><label>图片佐证（可选）</label><input type="file" id="repFile" accept="image/*" style="margin-bottom:8px;"><span class="hint" style="font-size:12px;color:var(--muted);" id="repFileHint"></span></div>
@@ -139,6 +147,7 @@
 
   <script src="js/store.js"></script>
   <script src="js/guard.js"></script>
+  <script src="js/toast.js"></script>
   <script src="js/main.js"></script>
   <script src="js/site.js"></script>
   <script src="js/vendor-image-compression.js"></script>
@@ -223,14 +232,27 @@
     if (isJiwei) {
       document.getElementById("reportSec").style.display = "";
       let repEvidence = [];
+      // 实名 / 匿名切换
+      let repMode = "anon";
+      const toggleRepMode = (mode) => {
+        repMode = mode;
+        document.querySelectorAll("#repMode button").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+        const hint = document.getElementById("repModeHint");
+        hint.textContent = mode === "real"
+          ? "实名：将记录你的姓名与账号，便于纪检部核实与反馈。"
+          : "匿名：不会记录你的身份；纪检成员仅能看到举报内容。";
+      };
+      document.querySelectorAll("#repMode button").forEach((b) => b.addEventListener("click", () => toggleRepMode(b.dataset.mode)));
       document.getElementById("btnReport").addEventListener("click", () => {
         const r = STORE.submitReport({
+          mode: repMode,
           target: document.getElementById("repTarget").value.trim(),
           detail: document.getElementById("repDetail").value.trim(),
           evidence: repEvidence,
           other: document.getElementById("repOther").value.trim(),
         });
-        alert(r.msg || "提交成功");
+        if (r.ok) { window.showToast("举报提交成功", "success"); }
+        else { window.showToast(r.msg || "提交失败", "error"); }
         if (r.ok) {
           document.getElementById("repTarget").value = "";
           document.getElementById("repDetail").value = "";
@@ -332,10 +354,13 @@
       function renderReports() {
         const host = document.getElementById("mt-reports");
         const list = STORE.myReports();
-        if (!list.length) { host.innerHTML = '<p class="muted-note">暂无匿名举报。</p>'; return; }
+        if (!list.length) { host.innerHTML = '<p class="muted-note">暂无举报。</p>'; return; }
         host.innerHTML = list.map((r, i) => {
           const stLabel = r.status === "open" ? "待受理" : r.status === "closed" ? "已归档" : "处理中";
-          return '<div class="redeem-item"><div class="ri-body"><b>举报 #' + (i + 1) + '</b>' +
+          const modeLabel = r.mode === "real"
+            ? '实名：' + esc(r.reporter || "未知")
+            : '匿名举报';
+          return '<div class="redeem-item"><div class="ri-body"><b>举报 #' + (i + 1) + '</b> · <span class="muted-note">' + modeLabel + '</span>' +
             (r.target ? '<div class="ri-cost">涉案：' + esc(r.target) + '</div>' : "") +
             (r.detail ? '<div class="ri-cost">经过：' + esc(r.detail) + '</div>' : "") +
             (r.evidence && r.evidence.length ? '<div class="ri-cost">佐证：' + r.evidence.length + ' 张</div>' : "") +

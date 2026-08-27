@@ -38,7 +38,6 @@ const STORE = (function () {
     signups: "xh_signups",      // 活动接龙/报名
     licenses: "xh_licenses",    // 市场监督管理局：营业执照
     products: "xh_products",    // 商店：商品
-    treasury: "xh_treasury",    // 商店：公共池（老师商品积分流入）
     orders: "xh_orders",        // 商店：订单记录
     logs: "xh_logs",            // 管理员操作日志
     gallery: "xh_gallery",      // 公开相册：成员/家长共同上传
@@ -319,7 +318,7 @@ const STORE = (function () {
         KEY.reports, KEY.cases, KEY.articles, KEY.meds, KEY.albums, KEY.notices, KEY.duty,
         KEY.wall, KEY.votes, KEY.groups,
         KEY.stars, KEY.wishes, KEY.signups, KEY.licenses, KEY.products,
-        KEY.treasury, KEY.orders, KEY.logs, KEY.gallery,
+        KEY.orders, KEY.logs, KEY.gallery,
       ].forEach((k) => localStorage.removeItem(k));
       localStorage.setItem(KEY.seedVer, String(SEED_VERSION));
     }
@@ -392,7 +391,6 @@ const STORE = (function () {
     lsSet(KEY.signups, []);
     lsSet(KEY.licenses, []);
     lsSet(KEY.products, []);
-    lsSet(KEY.treasury, []);
     lsSet(KEY.orders, []);
 
     // 小组：来自《7.1班分组.xlsx》核对后分组（仅第一~七组，第八组以表为准暂不导入）
@@ -538,7 +536,6 @@ const STORE = (function () {
       signups: [],
       licenses: [],
       products: [],
-      treasury: [],
       orders: [],
       albums: [{ id: uid("alb"), name: "班级风采掠影", author: "系统", createdTs: now(), photos, status: "published" }],
       meta: { lastUpdate: now(), lastOperator: "系统初始化" },
@@ -737,7 +734,7 @@ const STORE = (function () {
   /* ---------- 权限 ---------- */
   // 可编辑操行银行：教师/班委/管理员/超级管理员
   function canEditRole(role) { return ["teacher", "admin", "monitor", "superadmin"].includes(role); }
-  // 超级管理员（可进后台）：admin（班主任）与 superadmin（陈劲豪）
+  // 超级管理员（可进后台）：admin（班主任）与 superadmin（系统超管）
   function isSuperAdmin(role) { return role === "admin" || role === "superadmin"; }
   // 管理员级别（用于操作日志查看权限）：超管=3 班主任=2 教师/班委=1 其余=0
   function roleRank(role) {
@@ -1105,7 +1102,7 @@ const STORE = (function () {
   /* ============================================================
      用户中心：联系方式 / 简介 / 个人图片
      ============================================================ */
-  function updateProfile({ contact, bio }) {
+  async function updateProfile({ contact, bio }) {
     const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
     const users = getUsers();
     const u = users.find((x) => x.id === s.id);
@@ -1118,7 +1115,7 @@ const STORE = (function () {
     }
     if (bio !== undefined) u.bio = String(bio || "").slice(0, 120);
     saveUsers(users);
-    pushMe({ contact: u.contact, bio: u.bio });
+    await pushMe({ contact: u.contact, bio: u.bio }); // 等待服务端落库，避免刷新后联系方式丢失
     refreshSession();
     return { ok: true };
   }
@@ -1224,20 +1221,22 @@ const STORE = (function () {
   }
 
   /* ============================================================
-     纪检：匿名举报（全站登录用户可提交，仅纪检成员可见）
+     纪检：实名 / 匿名举报（全站登录用户可提交，仅纪检成员可见）
      ============================================================ */
   function myReports() { return lsGet(KEY.reports, []); }
   function submitReport(fields) {
     const s = getSession(); if (!s) return { ok: false, msg: "请先登录" };
     if (!fields || (!fields.target && !fields.detail)) return { ok: false, msg: "请填写涉案人员或案情经过至少一项" };
     const list = myReports();
+    const reporterName = (s.nickname || s.name || "") + "（" + (s.account || "") + "）";
     list.unshift({
       id: uid("rep"), ts: now(),
       target: fields.target || "",       // 涉案人员
       detail: fields.detail || "",       // 案情经过
       evidence: fields.evidence || [],   // 图片佐证
       other: fields.other || "",         // 其他说明
-      reporter: "",                      // 匿名，不记录身份
+      mode: fields.mode === "real" ? "real" : "anon", // real=实名 / anon=匿名
+      reporter: fields.mode === "real" ? reporterName : "", // 实名时记录举报人，匿名留空
       status: "open",
     });
     saveReport(list);
@@ -1829,16 +1828,13 @@ const STORE = (function () {
   function myProducts() { const s = getSession(); if (!s) return []; return getProducts().filter((p) => p.uid === s.id).slice().reverse(); }
   function myLicense() { const s = getSession(); if (!s) return null; return userLicense(s.id); }
 
-  /* ---- 公共池（老师商品积分流入） ---- */
-  function getTreasury() { return lsGet(KEY.treasury, []); }
-  function treasuryBalance() { return Math.round(getTreasury().reduce((s, r) => s + (r.delta || 0), 0) * 100) / 100; }
   /* ---- 订单 ---- */
   function getOrders() { return lsGet(KEY.orders, []); }
   function myOrders() { const s = getSession(); if (!s) return []; return getOrders().filter((o) => o.buyerId === s.id); }
   function mySoldOrders() { const s = getSession(); if (!s) return []; return getOrders().filter((o) => o.sellerId === s.id); }
 
   /* ---- 购买商品（即时成交 · 积分结算） ---- */
-  // 老师/超管买家：积分流入公共池；持证学生卖家：积分流入卖家。
+  // 老师/超管的商品售出后，积分直接回流经济系统（不设公共池）；持证学生卖家积分流入卖家。
   function buyProduct(id) {
     const s = getSession();
     if (!s) return { ok: false, msg: "请先登录" };
@@ -1866,10 +1862,7 @@ const STORE = (function () {
     ledger.push({ id: uid("led"), uid: buyer.id, name: buyer.name, delta: -price, after: buyer.score, reason: "购买「" + p.title + "」", operator: s.name, operatorRole: s.role, ts: now() });
 
     if (isTeacherSeller) {
-      // 流入公共池
-      const t = getTreasury();
-      t.push({ id: uid("trs"), delta: price, reason: "售出「" + p.title + "」（" + p.name + "）", ts: now() });
-      lsSet(KEY.treasury, t);
+      // 老师/超管售出：积分直接回流经济系统，不再计入公共池
     } else if (seller) {
       // 流入卖家
       seller.score = Math.round((seller.score + price) * 100) / 100;
@@ -1959,7 +1952,7 @@ const STORE = (function () {
     getLicenses, getProducts, userLicense, approvedLicense, canPublish,
     applyLicense, reviewLicense,
     publishProduct, reviewProduct, deleteProduct, publishedProducts, myProducts, myLicense,
-    buyProduct, getTreasury, treasuryBalance, getOrders, myOrders, mySoldOrders,
+    buyProduct, getOrders, myOrders, mySoldOrders,
     logAction, getLogs, clearLogs, roleRank,
     fmtTime, fmtMoney, now,
   };

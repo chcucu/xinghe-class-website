@@ -54,16 +54,16 @@
 
     // bind
     document.querySelectorAll(".btn-approve").forEach((b) => {
-      b.addEventListener("click", () => { const r = STORE.reviewLicense(b.dataset.lid, true); alert(r.ok ? "已批准" : r.msg); renderReviews(); renderLicense(); renderShell(); });
+      b.addEventListener("click", () => { const r = STORE.reviewLicense(b.dataset.lid, true); r.ok ? window.showToast("执照已批准", "success") : window.showToast(r.msg, "error"); renderReviews(); renderLicense(); renderShell(); });
     });
     document.querySelectorAll(".btn-reject").forEach((b) => {
-      b.addEventListener("click", () => { const reason = prompt("驳回理由（可选）", ""); if (reason === null) return; const r = STORE.reviewLicense(b.dataset.lid, false, reason); alert(r.ok ? "已驳回" : r.msg); renderReviews(); renderLicense(); });
+      b.addEventListener("click", () => { const reason = prompt("驳回理由（可选）", ""); if (reason === null) return; const r = STORE.reviewLicense(b.dataset.lid, false, reason); r.ok ? window.showToast("执照已驳回", "success") : window.showToast(r.msg, "error"); renderReviews(); renderLicense(); });
     });
     document.querySelectorAll(".btn-pub-approve").forEach((b) => {
-      b.addEventListener("click", () => { const r = STORE.reviewProduct(b.dataset.pid, true); alert(r.ok ? "已上架" : r.msg); renderReviews(); renderShell(); });
+      b.addEventListener("click", () => { const r = STORE.reviewProduct(b.dataset.pid, true); r.ok ? window.showToast("商品已上架", "success") : window.showToast(r.msg, "error"); renderReviews(); renderShell(); });
     });
     document.querySelectorAll(".btn-pub-reject").forEach((b) => {
-      b.addEventListener("click", () => { const reason = prompt("拒绝理由（可选）", ""); if (reason === null) return; const r = STORE.reviewProduct(b.dataset.pid, false, reason); alert(r.ok ? "已拒绝" : r.msg); renderReviews(); });
+      b.addEventListener("click", () => { const reason = prompt("拒绝理由（可选）", ""); if (reason === null) return; const r = STORE.reviewProduct(b.dataset.pid, false, reason); r.ok ? window.showToast("商品已拒绝上架", "success") : window.showToast(r.msg, "error"); renderReviews(); });
     });
   }
 
@@ -100,7 +100,7 @@
       applicant: document.getElementById("licApplicant").value,
       staff: document.getElementById("licStaff").value,
     });
-    alert(r.ok ? "申请已提交，等待市监局审批" : r.msg);
+    if (r.ok) { window.showToast("申请已提交，等待市监局审批", "success"); } else { window.showToast(r.msg, "error"); }
     renderLicense();
   });
 
@@ -114,7 +114,7 @@
       stock: document.getElementById("prodStock").value,
       cover: document.getElementById("prodCover").value,
     });
-    alert(r.ok ? r.msg : r.msg);
+    if (r.ok) { window.showToast(r.msg, "success"); } else { window.showToast(r.msg, "error"); }
     renderMyProducts();
     renderShell();
     renderReviews();
@@ -132,7 +132,7 @@
         ).join("")
       : '';
     document.querySelectorAll(".btn-delete-prod").forEach((b) => {
-      b.addEventListener("click", () => { if (!confirm("确认删除此商品？")) return; const r = STORE.deleteProduct(b.dataset.pid); alert(r.ok ? "已删除" : r.msg); renderMyProducts(); renderShell(); });
+      b.addEventListener("click", () => { if (!confirm("确认删除此商品？")) return; const r = STORE.deleteProduct(b.dataset.pid); r.ok ? window.showToast("商品已删除", "success") : window.showToast(r.msg, "error"); renderMyProducts(); renderShell(); });
     });
   }
   renderMyProducts();
@@ -150,12 +150,6 @@
       : '<span class="muted-note">暂无公示店铺</span>';
   }
   renderLicenseBoard();
-
-  /* ---- 公共池 ---- */
-  function renderTreasury() {
-    document.getElementById("treasuryBalance").textContent = STORE.fmtMoney(STORE.treasuryBalance());
-  }
-  renderTreasury();
 
   /* ---- 我的购买记录 ---- */
   function renderMyOrders() {
@@ -196,9 +190,8 @@
       b.addEventListener("click", () => {
         if (!confirm("确认用积分购买该商品？")) return;
         const r = STORE.buyProduct(b.dataset.pid);
-        alert(r.ok ? "购买成功！" : r.msg);
+        if (r.ok) { window.showToast("购买成功！", "success"); } else { window.showToast(r.msg, "error"); }
         renderShell();
-        renderTreasury();
         renderMyOrders();
         renderMyProducts();
       });
