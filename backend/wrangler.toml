@@ -13,7 +13,12 @@ name = "xinghe-bank"
 main = "worker.js"
 compatibility_date = "2024-11-01"
 
+# 自定义路由：让后端 API 通过国内可达的域名访问（.workers.dev 在大陆被屏蔽）
+routes = [
+  { pattern = "xinghe-api.tenyearmc.top", custom_domain = true }
+]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "xinghe-bank"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "0bbe5f2e-a595-4b3f-8c1a-d5798ef767e5"

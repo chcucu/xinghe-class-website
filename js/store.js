@@ -8,8 +8,8 @@
 const STORE = (function () {
   // —— 部署配置 ——
   // 本地开发：null（用 localStorage）。
-  // 上线：填后端 Worker 地址，如 "https://xinghe-bank.你的子域.workers.dev/api"
-  const apiBase = null;
+  // 上线：填后端 Worker 地址（已绑定自定义域名，国内可直接访问）
+  const apiBase = "https://xinghe-api.tenyearmc.top/api";
 
   // 后端模式下的会话 / 同步标记
   const TOKEN_KEY = "xh_api_token";

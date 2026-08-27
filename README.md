@@ -46,19 +46,16 @@
 
 默认存在浏览器的 localStorage 里，每个浏览器各存一份，互不相通。
 
-要让大家共用同一份数据，需要部署 Cloudflare Worker 后端，后端代码在 backend 文件夹里。部署后把所有数据放进 D1 数据库，全班同学和家长就能看到同一份内容了。
+线上版已经部署了 Cloudflare Worker 后端，数据统一存到 D1 数据库，全班同学和家长看到的是同一份内容。后端地址是 `https://xinghe-api.tenyearmc.top/api`，绑定了自定义域名，国内可以直接访问（`.workers.dev` 域名在大陆被屏蔽，所以没有用它）。
 
-部署后端：
+后端代码在 backend 文件夹里。如果以后要重新部署：
 
 1. 装好 Node.js，在 backend 文件夹打开终端。
-2. 创建数据库：`npx wrangler d1 create xinghe-bank`，把返回的 database_id 填到 backend/wrangler.toml 里。
-3. 建表：`npx wrangler d1 execute xinghe-bank --file=./schema.sql`
-4. 导入初始账号：`npx wrangler d1 execute xinghe-bank --file=./seed.sql`（可用 `node import.mjs` 重新生成 seed.sql）
-5. 部署：`npx wrangler deploy`，会得到一个类似 `https://xinghe-bank.你的子域.workers.dev` 的地址。
-6. 打开 js/store.js，把第 12 行的 `apiBase` 改成该地址加 `/api`。
-7. 重新部署前端到 Pages，让同学用新地址访问。
+2. 建表：`npx wrangler d1 execute xinghe-bank --file=./schema.sql`
+3. 初始化数据：`node bootstrap.mjs`（从 data/*.json 生成种子并导入，只成功一次）
+4. 部署：`npx wrangler deploy`（域名路由写在 wrangler.toml 里）
 
-部署完成后，任何人第一次打开网站，会自动把初始数据导入 D1，之后的改动都会同步到服务器。
+前端 js/store.js 里的 `apiBase` 已经指向上面那个后端地址，不需要再改。
 
 ## 开源许可
 
