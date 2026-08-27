@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班网站 · 家长 / 访客注册">
+  <title>注册 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <main class="auth-wrap">
+    <div class="auth-card">
+      <span class="win-tl"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+      <div class="auth-logo"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'"></div>
+      <h1 class="auth-title" id="regTitle">注册</h1>
+      <p class="auth-sub" id="regSub">昆三中度假学校 · 八年级一班</p>
+
+      <div class="auth-error" id="authError"></div>
+
+      <form id="regForm" autocomplete="off">
+        <!-- 家长专用：选择关联孩子 -->
+        <div class="field" id="childField" style="display:none;">
+          <label for="studentId">关联的孩子</label>
+          <select id="studentId" required></select>
+          <p class="hint">请选择您是哪位同学的家长，班主任审核通过后即可查看孩子档案。</p>
+        </div>
+
+        <div class="field">
+          <label for="name">姓名 / 称呼</label>
+          <input type="text" id="name" placeholder="请输入您的姓名" required>
+        </div>
+        <div class="field">
+          <label for="account">登录账号</label>
+          <input type="text" id="account" placeholder="设置一个登录账号" required>
+        </div>
+        <div class="field">
+          <label for="password">登录密码</label>
+          <input type="password" id="password" placeholder="至少 4 位" required>
+        </div>
+        <div id="textpick" class="textpick"></div>
+        <button type="submit" class="btn btn-block" id="regBtn">提交注册申请</button>
+      </form>
+
+      <p class="auth-switch">注册申请需经<b>班主任审核</b>通过后方可登录。</p>
+      <p class="id-back"><a href="identity.html">← 返回选择身份</a> 或 <a href="login.html">已有账号去登录</a></p>
+    </div>
+  </main>
+
+  <script src="js/store.js"></script>
+  <script src="js/pwview.js"></script>
+  <script src="js/textpick.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    // 文字点选人机验证
+    const tp = (window.TEXTPICK) ? window.TEXTPICK.create("textpick") : null;
+    const params = new URLSearchParams(location.search);
+    const role = params.get("role") === "parent" ? "parent" : "guest";
+    const isParent = role === "parent";
+    const next = params.get("next") || "";
+
+    document.getElementById("regTitle").textContent = isParent ? "家长注册" : "访客注册";
+    document.getElementById("regSub").textContent = isParent
+      ? "关联您的孩子 · 需班主任审核"
+      : "浏览班级公开内容 · 需班主任审核";
+
+    // 家长：加载可选孩子（学生/超管同学）
+    if (isParent) {
+      const students = STORE.getUsers().filter((u) => u.role === "student" || u.role === "superadmin");
+      document.getElementById("childField").style.display = "";
+      document.getElementById("studentId").innerHTML =
+        '<option value="">请选择您的孩子</option>' +
+        students.map((u) => '<option value="' + u.id + '">' + u.name + '</option>').join("");
+    }
+
+    const authError = document.getElementById("authError");
+    function showError(msg) {
+      if (!msg) { authError.classList.remove("show"); authError.textContent = ""; return; }
+      authError.textContent = msg;
+      authError.classList.add("show");
+    }
+
+    document.getElementById("regForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (tp && !tp.verify()) { showError("请先完成人机验证（按提示顺序点选文字）"); if (tp.refresh) tp.refresh(); return; }
+      const name = document.getElementById("name").value.trim();
+      const account = document.getElementById("account").value.trim();
+      const password = document.getElementById("password").value;
+      const studentId = document.getElementById("studentId") ? document.getElementById("studentId").value : "";
+
+      if (!name) { showError("请填写姓名"); return; }
+      if (!account) { showError("请填写登录账号"); return; }
+      if (password.length < 4) { showError("密码至少 4 位"); return; }
+      if (isParent && !studentId) { showError("请选择您关联的孩子"); return; }
+
+      const r = STORE.register({ role, name, account, password, studentId });
+      if (!r.ok) { showError(r.msg); return; }
+      showError("");
+      alert(r.msg);
+      location.href = "login.html" + (next ? "?next=" + encodeURIComponent(next) : "");
+    });
+  })();
+  </script>
+</body>
+</html>

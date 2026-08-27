@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班商店 · 市场监督管理局">
+  <title>班级商店 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav"></nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:40px; padding-bottom:80px;">
+    <div class="toolbar">
+      <div>
+        <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>班级商店</span></div>
+        <h1 class="page-title" style="font-size:30px; margin-top:6px;">班级商店</h1>
+        <p class="muted-note" style="margin-top:4px;">市场监督管理局：营业执照审批 · 商品上架监管 · 店铺公示</p>
+      </div>
+    </div>
+
+    <!-- 公共积分池 -->
+    <div class="duty-strip panel" style="margin:0 0 24px;">
+      <b>班级公益积分池</b>
+      <span style="font-family:var(--font-play);font-weight:700;" id="treasuryBalance">0</span> 分
+      <span class="muted-note">老师发布的商品售出后，积分归入池中（可作班级活动奖励）。</span>
+    </div>
+
+    <!-- 市监局审批面板 -->
+    <div id="shichangPanel" style="display:none; margin-bottom:24px; grid-gap:22px;">
+      <div class="panel" style="margin-bottom:22px;">
+        <h3>待审批 · 营业执照</h3>
+        <div id="licReview"></div>
+      </div>
+      <div class="panel">
+        <h3>待审批 · 商品上架</h3>
+        <div id="prodReview"></div>
+      </div>
+    </div>
+
+    <!-- 我的店铺 -->
+    <div id="myShopPanel" class="panel" style="margin-bottom:26px;">
+      <h3>我的店铺</h3>
+      <div id="myLicenseBox"></div>
+      <div id="myLicApply" style="display:none; margin-top:14px;">
+        <div class="field"><label>经营范围</label><input class="mini" id="licScope" placeholder="例如：手作坊 / 代购服务 / 二手文具" style="width:100%;"></div>
+        <div class="field"><label>申请人</label><input class="mini" id="licApplicant" placeholder="店铺申请人姓名" style="width:100%;"></div>
+        <div class="field"><label>营业人员（可填多人）</label><input class="mini" id="licStaff" placeholder="例如：张三、李四" style="width:100%;"></div>
+        <button class="btn" id="btnApplyLicense">提交执照申请</button>
+        <p class="muted-note">普通同学需先持有已审批的营业执照才能发布商品；老师无需执照即可开店。</p>
+      </div>
+      <div id="myPublish" style="display:none; margin-top:16px; border-top:1px solid var(--line-2); padding-top:16px;">
+        <div class="field"><label>发布新商品</label></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;" id="prodForm">
+          <input class="mini" id="prodTitle" placeholder="商品名称" style="width:100%;">
+          <textarea class="mini" id="prodDesc" rows="2" placeholder="商品描述" style="width:100%;"></textarea>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <select class="mini" id="prodType" style="flex:1;"><option value="virtual">虚拟商品</option><option value="physical">实物商品</option></select>
+            <input class="mini" id="prodPrice" type="number" step="0.01" placeholder="价格（积分）" style="flex:1;">
+            <input class="mini" id="prodStock" type="number" placeholder="库存" style="flex:1;">
+          </div>
+          <input class="mini" id="prodCover" placeholder="封面图片 URL（可选）" style="width:100%;">
+          <button class="btn" id="btnPublishProduct" style="max-width:200px;">发布商品</button>
+        </div>
+        <div id="myProductList" style="margin-top:16px;"></div>
+      </div>
+      <div id="myOrdersBox" style="margin-top:16px;border-top:1px solid var(--line-2);padding-top:16px;">
+        <b>我的购买记录</b>
+        <div id="myOrderList" style="margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <!-- 店铺公示 -->
+    <div class="panel" style="margin-bottom:26px;">
+      <h3>执照公示</h3>
+      <div id="licBoard" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:12px;"></div>
+    </div>
+
+    <!-- 货架 -->
+    <div class="panel">
+      <h3>在售商品</h3>
+      <div id="storeShell" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:12px;"></div>
+    </div>
+  </main>
+
+  <script src="js/store.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script src="js/shop.js"></script>
+</body>
+</html>

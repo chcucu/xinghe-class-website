@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班 · 通知公告 —— 班级重要消息第一时间知晓">
+  <title>通知公告 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav"><ul></ul></nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>通知公告</span></div>
+      <span class="eyebrow">Notices</span>
+      <h1>通知公告</h1>
+      <p class="sub">班会、活动、重要提醒……重要消息都在这里。</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:40px 0 20px;">
+    <div class="panel" id="noticeManage" style="display:none;margin-bottom:26px;">
+      <h3>发布通知（班主任/超管）</h3>
+      <div class="field"><label>标题</label><input class="mini" id="ntTitle" style="width:100%;"></div>
+      <div class="field"><label>内容</label><textarea class="mini" id="ntContent" rows="4"></textarea></div>
+      <button class="btn btn-block" id="btnAddNotice" style="max-width:200px;">发布</button>
+    </div>
+
+    <div id="noticeList"></div>
+    <p class="muted-note" id="noticeEmpty" style="display:none;">暂无通知公告。</p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="notices.html">通知公告</a></li>
+            <li><a href="duty.html">值日表</a></li>
+            <li><a href="gallery.html">班级相册</a></li>
+            <li><a href="votes.html">投票</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>星聚成河 · 逐光而行</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    const s = STORE.getSession();
+    if (!s) { location.href = "login.html"; return; }
+    const isAdmin = STORE.isSuperAdmin(s.role);
+
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+    if (isAdmin) document.getElementById("noticeManage").style.display = "block";
+
+    function render() {
+      const list = STORE.getNotices();
+      const box = document.getElementById("noticeList");
+      const empty = document.getElementById("noticeEmpty");
+      if (!list.length) { box.innerHTML = ""; empty.style.display = "block"; return; }
+      empty.style.display = "none";
+      box.innerHTML = list.map((n) => `
+        <div class="panel" style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+            <h3>${esc(n.title)}</h3>
+            ${isAdmin ? '<button class="btn-outline" data-del="' + n.id + '" style="padding:5px 12px;font-size:12px;">删除</button>' : ""}
+          </div>
+          <p style="white-space:pre-wrap;color:var(--text-soft);margin-top:8px;">${esc(n.content)}</p>
+          <div class="hint" style="font-size:12.5px;color:var(--muted);margin-top:12px;">${esc(n.author)} · ${STORE.fmtTime(n.ts)}</div>
+        </div>`).join("");
+      document.querySelectorAll("[data-del]").forEach((b) => {
+        b.addEventListener("click", () => { if (!confirm("确认删除该通知？")) return; STORE.deleteNotice(b.dataset.del); render(); });
+      });
+    }
+
+    document.getElementById("btnAddNotice").addEventListener("click", () => {
+      const title = document.getElementById("ntTitle").value.trim();
+      const content = document.getElementById("ntContent").value.trim();
+      if (!title || !content) { alert("标题与内容不能为空"); return; }
+      const r = STORE.addNotice(title, content);
+      if (r.ok) { alert("已发布"); document.getElementById("ntTitle").value = ""; document.getElementById("ntContent").value = ""; render(); }
+      else alert(r.msg);
+    });
+
+    render();
+  })();
+  </script>
+</body>
+</html>

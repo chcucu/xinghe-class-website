@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班 · 悄悄话墙 —— 一段匿名的心声，送给班级、老师或某个同学">
+  <title>悄悄话墙 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav"><ul></ul></nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>悄悄话墙</span></div>
+      <span class="eyebrow">Message Wall</span>
+      <h1>悄悄话墙</h1>
+      <p class="sub">有些话不需要署名。写给班级、写给某一门课、或写给某个闪闪发光的同学。</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:40px 0 20px;">
+    <div class="panel" style="margin-bottom:26px;">
+      <h3>写一条悄悄话</h3>
+      <div class="field">
+        <label>写给谁（可选）</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <select class="mini" id="wlTarget" style="max-width:200px;">
+            <option value="class">给整个班</option>
+            <option value="student">给某位同学</option>
+            <option value="teacher">给某位老师</option>
+            <option value="dept">给某个部门</option>
+          </select>
+          <input type="text" class="mini" id="wlName" placeholder="选“同学/老师/部门”时填写名字" style="flex:1;min-width:180px;">
+        </div>
+      </div>
+      <div class="field">
+        <label>内容（200 字以内）</label>
+        <textarea class="mini" id="wlText" rows="3" maxlength="200" placeholder="在这里写下你的悄悄话…"></textarea>
+      </div>
+      <button class="btn btn-block" id="btnPost" style="max-width:220px;">发布到墙上</button>
+      <p class="hint" style="font-size:12px;color:var(--muted);margin-top:8px;">匿名展示，即发即公开；如内容不当，超管可随时撤下。</p>
+    </div>
+
+    <div id="wallList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;"></div>
+    <p class="muted-note" id="wallEmpty" style="display:none;">还没有悄悄话，来写下第一条吧。</p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="gallery.html">班级相册</a></li>
+            <li><a href="votes.html">投票</a></li>
+            <li><a href="messages.html">悄悄话墙</a></li>
+            <li><a href="archive.html">成长档案</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>关于</h4>
+          <ul>
+            <li><a href="index.html">返回首页</a></li>
+            <li><a href="class.html">了解我们</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>星聚成河 · 逐光而行</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    const s = STORE.getSession();
+    if (!s) { location.href = "login.html"; return; }
+    const isAdmin = STORE.isSuperAdmin(s.role);
+
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+    const targetLabel = { class: "给整个班", student: "给同学", teacher: "给老师", dept: "给部门" };
+
+    function render() {
+      const list = STORE.getWall();
+      const box = document.getElementById("wallList");
+      const empty = document.getElementById("wallEmpty");
+      if (!list.length) { box.innerHTML = ""; empty.style.display = "block"; return; }
+      empty.style.display = "none";
+      box.innerHTML = list.map((w) => {
+        const who = w.toType === "class"
+          ? '<span class="pc-role">给整个班</span>'
+          : '<span class="pc-role">' + esc((targetLabel[w.toType] || "") + " · " + (w.toName || "")) + '</span> ' + esc(w.toName);
+        return `
+        <div class="panel" style="display:flex;flex-direction:column;justify-content:space-between;">
+          <p style="font-family:var(--font-callig);font-size:20px;line-height:1.7;min-height:64px;">“${esc(w.text)}”</p>
+          <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12.5px;color:var(--muted);">匿名 · ${STORE.fmtTime(w.ts)}</span>
+            <span style="font-size:12.5px;color:var(--text-soft);">${who}</span>
+          </div>
+          ${isAdmin ? '<button class="btn-outline" data-del="' + w.id + '" style="align-self:flex-end;margin-top:10px;padding:5px 10px;font-size:12px;">撤下</button>' : ""}
+        </div>`;
+      }).join("");
+      document.querySelectorAll("[data-del]").forEach((b) => {
+        b.addEventListener("click", () => {
+          if (!confirm("确认撤下这条悄悄话？")) return;
+          STORE.deleteWall(b.dataset.del); render();
+        });
+      });
+    }
+
+    document.getElementById("btnPost").addEventListener("click", () => {
+      const t = document.getElementById("wlText").value.trim();
+      if (!t) { alert("内容不能为空"); return; }
+      const r = STORE.postWall({ toType: document.getElementById("wlTarget").value, toName: document.getElementById("wlName").value.trim(), text: t });
+      if (r.ok) { document.getElementById("wlText").value = ""; document.getElementById("wlName").value = ""; render(); }
+      else alert(r.msg);
+    });
+
+    render();
+  })();
+  </script>
+</body>
+</html>

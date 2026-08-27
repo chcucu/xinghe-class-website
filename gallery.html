@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班班级相册 —— 记录每一个精彩瞬间">
+  <title>班级相册 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <ul>
+          <li><a href="index.html">首页</a></li>
+          <li><a href="class.html">班级介绍</a></li>
+          <li><a href="news.html">班级新闻</a></li>
+          <li><a href="gallery.html" class="active">班级相册</a></li>
+          <li><a href="honor.html">班级荣誉</a></li>
+          <li><a href="members.html">师生风采</a></li>
+          <li><a href="bank.html">操行银行</a></li>
+        </ul>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>班级相册</span></div>
+      <span class="eyebrow">Gallery</span>
+      <h1>班级相册</h1>
+      <p class="sub">把每一个转瞬即逝的瞬间，收藏成岁月里闪亮的星。</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="gallery-grid" id="galleryGrid"></div>
+    </div>
+  </section>
+
+  <!-- 灯箱 -->
+  <div class="lightbox" id="lightbox">
+    <button class="lb-close">×</button>
+    <button class="lb-prev">‹</button>
+    <img class="lb-img" src="" alt="">
+    <button class="lb-next">›</button>
+    <div class="lb-cap"></div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="news.html">班级新闻</a></li>
+            <li><a href="gallery.html">班级相册</a></li>
+            <li><a href="honor.html">班级荣誉</a></li>
+            <li><a href="members.html">师生风采</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>关于</h4>
+          <ul>
+            <li><a href="index.html">返回首页</a></li>
+            <li><a href="class.html">了解我们</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>星聚成河 · 逐光而行</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      const grid = document.getElementById("galleryGrid");
+      const total = 107;
+      let html = "";
+      for (let i = 1; i <= total; i++) {
+        const n = String(i).padStart(2, "0");
+        html += '<div class="gallery-item"><img src="image/class/' + n + '.jpg" alt="班级风采" loading="lazy"></div>';
+      }
+      grid.innerHTML = html;
+    })();
+  </script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# ============================================================
+# 星河班 · 操行银行  Cloudflare Wrangler 配置
+# 部署步骤（暂不部署，供后续使用）：
+#   1) npm create cloudflare@latest  初始化（或直接使用本项目）
+#   2) npx wrangler d1 create xinghe-bank    # 创建 D1 数据库
+#   3) 将返回的 database_id 填入下方 [[d1_databases]]
+#   4) npx wrangler d1 execute xinghe-bank --file=./schema.sql   # 建表
+#   5) node import.mjs   # 导入 49 名学生+教师（见同目录 import.mjs）
+#   6) npx wrangler deploy   # 部署 Worker
+# ============================================================
+
+name = "xinghe-bank"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "xinghe-bank"
+database_id = "REPLACE_WITH_YOUR_D1_ID"

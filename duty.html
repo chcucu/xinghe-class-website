@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班 · 值日表 —— 每天的值日安排一目了然">
+  <title>值日表 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav"><ul></ul></nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>值日表</span></div>
+      <span class="eyebrow">Duty Roster</span>
+      <h1>值日表</h1>
+      <p class="sub">今天的辛勤，成就明天整洁的教室。看看今天轮到谁。</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:40px 0 20px;">
+    <div class="panel" id="dutyTodayPanel" style="margin-bottom:26px;">
+      <h3>今日值日</h3>
+      <div id="dutyToday">正在读取…</div>
+    </div>
+
+    <div class="panel" id="dutyManage" style="display:none;margin-bottom:26px;">
+      <h3>维护值日安排（班委及以上）</h3>
+      <div class="field"><label>日期</label><input class="mini" type="date" id="duDate"></div>
+      <div class="field"><label>值日安排</label><input class="mini" id="duGroup" placeholder="如：第 3 组 / 李明、王强" style="width:100%;"></div>
+      <div class="field"><label>备注（可选）</label><input class="mini" id="duNote" style="width:100%;"></div>
+      <button class="btn btn-block" id="btnAddDuty" style="max-width:200px;">添加安排</button>
+    </div>
+
+    <div id="dutyList"></div>
+    <p class="muted-note" id="dutyEmpty" style="display:none;">暂未安排值日。</p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="duty.html">值日表</a></li>
+            <li><a href="gallery.html">班级相册</a></li>
+            <li><a href="votes.html">投票</a></li>
+            <li><a href="messages.html">悄悄话墙</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>星聚成河 · 逐光而行</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    const s = STORE.getSession();
+    if (!s) { location.href = "login.html"; return; }
+    const canEdit = STORE.canEditRole(s.role);
+
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+    function todayStr() {
+      const d = new Date(); const p = (n) => String(n).padStart(2, "0");
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    }
+    function fmtDate(iso) {
+      const parts = String(iso).split("-");
+      if (parts.length !== 3) return iso;
+      const wd = ["日", "一", "二", "三", "四", "五", "六"][new Date(parts[0], parts[1] - 1, parts[2]).getDay()];
+      return parts[0] + "年" + Number(parts[1]) + "月" + Number(parts[2]) + "日 星期" + wd;
+    }
+
+    if (canEdit) document.getElementById("dutyManage").style.display = "block";
+
+    function render() {
+      const list = STORE.getDuty();
+      const today = todayStr();
+      const todays = list.filter((d) => d.date === today);
+
+      const todayBox = document.getElementById("dutyToday");
+      if (todays.length) {
+        todayBox.innerHTML = todays.map((d) => `
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+            <span style="flex:1;font-family:var(--font-play);font-size:20px;">${esc(d.group)}</span>
+            ${d.note ? '<span class="hint" style="font-size:12.5px;color:var(--text-soft);">' + esc(d.note) + '</span>' : ""}
+          </div>`).join("");
+      } else {
+        todayBox.innerHTML = '<p class="muted-note" style="margin-top:6px;">今天（' + today + '）暂无值日安排。</p>';
+      }
+
+      const box = document.getElementById("dutyList");
+      const empty = document.getElementById("dutyEmpty");
+      if (!list.length) { box.innerHTML = ""; empty.style.display = "block"; return; }
+      empty.style.display = "none";
+      box.innerHTML = list.slice().reverse().map((d) => `
+        <div class="panel" style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+          <div style="flex:1;">
+            <div style="font-family:var(--font-black);font-size:15.5px;">${fmtDate(d.date)}</div>
+            <div class="hint" style="font-size:13.5px;margin-top:2px;">${esc(d.group)}${d.note ? " · " + esc(d.note) : ""}</div>
+          </div>
+          ${canEdit ? '<button class="btn-outline" data-del="' + d.id + '" style="padding:5px 12px;font-size:12px;">删除</button>' : ""}
+        </div>`).join("");
+
+      document.querySelectorAll("[data-del]").forEach((b) => {
+        b.addEventListener("click", () => { if (!confirm("确认删除该值日安排？")) return; STORE.deleteDutyShift(b.dataset.del); render(); });
+      });
+    }
+
+    document.getElementById("btnAddDuty").addEventListener("click", () => {
+      const date = document.getElementById("duDate").value;
+      const group = document.getElementById("duGroup").value.trim();
+      const note = document.getElementById("duNote").value.trim();
+      if (!date || !group) { alert("日期与安排不能为空"); return; }
+      const r = STORE.addDutyShift({ date, group, members: [], note });
+      if (r.ok) { alert("已添加"); document.getElementById("duGroup").value = ""; document.getElementById("duNote").value = ""; render(); }
+      else alert(r.msg);
+    });
+
+    render();
+  })();
+  </script>
+</body>
+</html>

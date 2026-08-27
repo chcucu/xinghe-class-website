@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班 · 成长档案 —— 记录积分、勋章与每一份作品">
+  <title>成长档案 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav"><ul></ul></nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>成长档案</span></div>
+      <span class="eyebrow">Growth Archive</span>
+      <h1>成长档案</h1>
+      <p class="sub">积分的每一次增长、获得的每一枚称号、发表的每一份作品，都汇成你在星河里的成长轨迹。</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:40px 0 20px;">
+    <div class="toolbar">
+      <div class="userbar">
+        <a href="profile.html" style="font-size:13px;color:var(--text-soft);">个人中心</a>
+        <a href="admin.html" style="font-size:13px;color:var(--text-soft);display:none;" id="arAdminLink">后台</a>
+      </div>
+    </div>
+
+    <!-- 学期图册封面 -->
+    <div class="panel" id="coverCard" style="text-align:center;padding:44px 30px;margin-bottom:26px;background:linear-gradient(180deg,var(--ink),#1c1c20);color:#fff;">
+      <div style="font-family:var(--font-callig);font-size:44px;letter-spacing:.08em;" id="coverName">—</div>
+      <div style="font-size:15px;letter-spacing:.3em;margin-top:8px;color:#ddd;">星河班 · 学期成长图册</div>
+      <div style="display:flex;gap:28px;justify-content:center;margin-top:24px;flex-wrap:wrap;">
+        <div><div style="font-size:34px;font-weight:700;" id="coverScore">—</div><div style="font-size:12px;color:#bbb;margin-top:4px;">操行积分</div></div>
+        <div><div style="font-size:34px;font-weight:700;" id="coverBadges">—</div><div style="font-size:12px;color:#bbb;margin-top:4px;">荣誉称号</div></div>
+        <div><div style="font-size:34px;font-weight:700;" id="coverWorks">—</div><div style="font-size:12px;color:#bbb;margin-top:4px;">发表作品</div></div>
+        <div><div style="font-size:34px;font-weight:700;" id="coverGreet">—</div><div style="font-size:12px;color:#bbb;margin-top:4px;">收到悄悄话</div></div>
+      </div>
+    </div>
+
+    <!-- 勋章 -->
+    <div class="panel" style="margin-bottom:26px;">
+      <h3>我的荣誉称号</h3>
+      <div id="badgeList"><p class="muted-note" style="margin-top:8px;">暂无称号。称号由班主任/超管授予，继续加油。</p></div>
+    </div>
+
+    <!-- 作品 -->
+    <div class="panel" style="margin-bottom:26px;">
+      <h3>我的作品</h3>
+      <div id="workList"><p class="muted-note" style="margin-top:8px;">暂无已发表的新闻/小报作品。</p></div>
+    </div>
+
+    <!-- 小组 -->
+    <div class="panel" style="margin-bottom:26px;">
+      <h3>我的小组</h3>
+      <div id="myGroup"><p class="muted-note" style="margin-top:8px;">尚未分配小组（组长已登记，组员开学后补充）。</p></div>
+    </div>
+
+    <!-- 心愿 / 兑换目标 -->
+    <div class="panel" id="wishPanel" style="margin-bottom:26px;">
+      <h3>我的心愿 · 攒分目标</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;">
+        <input class="mini" id="wsTitle" placeholder="目标名称（例如：兑换一本书）" style="flex:2;min-width:200px;">
+        <input class="mini" id="wsCost" type="number" placeholder="目标积分" style="flex:1;min-width:100px;">
+        <button class="btn" id="btnAddWish">立下目标</button>
+      </div>
+      <div id="wishList"></div>
+    </div>
+
+    <!-- 成长时间线 -->
+    <div class="panel" style="margin-bottom:26px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <h3 style="margin-bottom:0;">我的成长时间线</h3>
+        <button class="btn-outline" id="btnExportTimeline" style="padding:6px 14px;font-size:13px;">导出 / 打印</button>
+      </div>
+      <div id="timeline" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- 小组积分排行 -->
+    <div class="panel">
+      <h3>小组积分排行</h3>
+      <div id="groupRank" style="margin-top:12px;"></div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="archive.html">成长档案</a></li>
+            <li><a href="messages.html">悄悄话墙</a></li>
+            <li><a href="votes.html">投票</a></li>
+            <li><a href="gallery.html">班级相册</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>星聚成河 · 逐光而行</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    const s = STORE.getSession();
+    if (!s) { location.href = "identity.html"; return; }
+    if (STORE.isSuperAdmin(s.role)) document.getElementById("arAdminLink").style.display = "";
+
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+    // 家长：查看关联孩子的档案（只读）；其余角色查看自己的档案
+    const isParent = s.role === "parent";
+    const child = isParent ? STORE.myChild() : null;
+    const targetId = (isParent && child) ? child.id : s.id;
+    const targetName = (isParent && child) ? (child.nickname || child.name) : (s.nickname || s.name);
+    if (isParent && !child) {
+      document.querySelector("main.container").innerHTML = '<div class="panel"><p class="muted-note">尚未关联孩子，请联系班主任为您补全关联信息。</p></div>';
+      return;
+    }
+    if (isParent) {
+      const sub = document.querySelector(".page-hero .sub");
+      if (sub) sub.textContent = "正在查看孩子「" + targetName + "」的成长档案（只读）。";
+      document.querySelectorAll(".panel h3").forEach((h) => { h.textContent = h.textContent.replace(/^我的/, "孩子的"); });
+      const wp = document.getElementById("wishPanel");
+      if (wp) wp.style.display = "none";
+      const exp = document.getElementById("btnExportTimeline");
+      if (exp) exp.style.display = "none";
+    }
+
+    function render() {
+      const a = STORE.archive(targetId);
+      if (!a) return;
+      const name = a.user.nickname || a.user.name;
+
+      document.getElementById("coverName").textContent = name;
+      document.getElementById("coverScore").textContent = a.score;
+      document.getElementById("coverBadges").textContent = a.badges.length;
+      document.getElementById("coverWorks").textContent = a.works.length;
+      document.getElementById("coverGreet").textContent = a.greetings;
+
+      // 勋章
+      if (a.badges.length) {
+        document.getElementById("badgeList").innerHTML = a.badges.map((b) => `
+          <span class="badge-chip">✦ ${esc(b.name)}</span>`).join("") +
+          '<p class="hint" style="font-size:12px;color:var(--muted);margin-top:8px;">由 ' + esc(a.badges[0].grantBy) + ' 授予</p>';
+      }
+      // 作品
+      if (a.works.length) {
+        document.getElementById("workList").innerHTML = a.works.map((w) => `
+          <div class="redeem-item"><div class="ri-body"><b>${esc(w.title)}</b><div class="ri-cost">${w.type} · ${STORE.fmtTime(w.date)}</div></div></div>`).join("");
+      }
+      // 小组
+      if (a.group) {
+        document.getElementById("myGroup").innerHTML =
+          '<p style="font-size:15px;">' + esc(a.group.name) + '<span class="pc-role" style="margin-left:8px;">组长 ' + esc(a.group.leaderName) + '</span></p>' +
+          (a.group.note ? '<p class="hint" style="font-size:12.5px;color:var(--text-soft);margin-top:4px;">' + esc(a.group.note) + '</p>' : "");
+      }
+      // 小组排行
+      document.getElementById("groupRank").innerHTML =
+        '<table class="admin-table"><thead><tr><th>排名</th><th>小组</th><th>组长</th><th>人数</th><th>小组总分</th></tr></thead><tbody>' +
+        a.groupStats.map((g, i) => `
+          <tr><td>${i + 1}</td><td><b>${esc(g.name)}</b></td><td>${esc(g.leaderName)}</td><td>${g.memberCount}</td><td>${STORE.fmtMoney(g.scoreSum)}</td></tr>`).join("") +
+        '</tbody></table>';
+    }
+
+    /* ---- 心愿 ---- */
+    function renderWishes() {
+      const me = STORE.findById(s.id);
+      const list = STORE.myWishes();
+      document.getElementById("wishList").innerHTML = list.length
+        ? list.map((w) => {
+            const pct = w.cost ? Math.min(100, Math.round(((me ? me.score : 0) / w.cost) * 100)) : 0;
+            const done = w.done;
+            return `
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2);flex-wrap:wrap;">
+              <span style="${done ? "text-decoration:line-through;color:var(--muted);" : "font-weight:600;"}">${esc(w.title)}</span>
+              <span class="muted-note">目标 ${STORE.fmtMoney(w.cost)} 分 · 已攒 ${pct}%</span>
+              <div style="flex:1;min-width:140px;height:6px;background:var(--bg-soft);border-radius:99px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:#000;"></div></div>
+              <button class="btn-outline" style="padding:4px 12px;font-size:12px;" data-tog="${w.id}">${done ? "取消达成" : "标记达成"}</button>
+              <button class="btn-outline" style="padding:4px 12px;font-size:12px;" data-del="${w.id}">删除</button>
+            </div>`;
+          }).join("")
+        : '<p class="muted-note" style="margin-top:8px;">还没有心愿，立一个攒分小目标吧。</p>';
+      document.querySelectorAll("[data-tog]").forEach((b) => b.addEventListener("click", () => { STORE.toggleWish(b.dataset.tog); renderWishes(); }));
+      document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => { if (!confirm("删除该目标？")) return; STORE.deleteWish(b.dataset.del); renderWishes(); }));
+    }
+    document.getElementById("btnAddWish").addEventListener("click", () => {
+      const r = STORE.addWish({ title: document.getElementById("wsTitle").value, cost: document.getElementById("wsCost").value });
+      alert(r.ok ? "已立下目标" : r.msg);
+      document.getElementById("wsTitle").value = "";
+      document.getElementById("wsCost").value = "";
+      renderWishes();
+    });
+    renderWishes();
+
+    /* ---- 成长时间线 ---- */
+    const ICON = { score: "积", badge: "章", work: "文", love: "语", shop: "兑", wish: "愿" };
+    function renderTimeline() {
+      const ev = STORE.timeline(targetId);
+      document.getElementById("timeline").innerHTML = ev.length
+        ? ev.map((e, i) => `
+            <div style="display:flex;gap:12px;padding-left:6px;${i ? "margin-top:14px;" : ""}">
+              <div style="width:30px;height:30px;border-radius:50%;background:#000;color:#fff;display:grid;place-items:center;font-size:13px;flex-shrink:0;">${ICON[e.icon] || "·"}</div>
+              <div style="flex:1;">
+                <div style="font-size:12px;color:var(--muted);">${esc(STORE.fmtTime(e.ts))}</div>
+                <div style="font-weight:600;margin-top:1px;">${esc(e.title)}</div>
+                <div class="muted-note">${esc(e.text)}</div>
+              </div>
+            </div>`).join("")
+        : '<p class="muted-note" style="margin-top:8px;">还没有成长记录。</p>';
+    }
+    document.getElementById("btnExportTimeline").addEventListener("click", () => {
+      const name = esc((STORE.findById(targetId).nickname || STORE.findById(targetId).name));
+      const ev = STORE.timeline(targetId);
+      let html = "<h2>" + name + " · 成长时间线</h2>";
+      ev.forEach((e) => { html += "<p><b>" + esc(STORE.fmtTime(e.ts)) + "</b> — " + esc(e.title) + "：" + esc(e.text) + "</p>"; });
+      const w = window.open("", "_blank");
+      w.document.write("<!DOCTYPE html><html><head><meta charset='utf-8'><title>成长时间线</title></head><body style='font-family:sans-serif;padding:40px;'>" + html + "<script>window.print()<\/script></body></html>");
+      w.document.close();
+    });
+    renderTimeline();
+
+    render();
+  })();
+  </script>
+</body>
+</html>

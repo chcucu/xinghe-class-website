@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班 · 个人中心 —— 头像、昵称与账号设置">
+  <title>个人中心 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <ul>
+          <li><a href="index.html">首页</a></li>
+          <li><a href="class.html">班级介绍</a></li>
+          <li><a href="news.html">班级新闻</a></li>
+          <li><a href="gallery.html">班级相册</a></li>
+          <li><a href="honor.html">班级荣誉</a></li>
+          <li><a href="members.html">师生风采</a></li>
+          <li><a href="bank.html">操行银行</a></li>
+        </ul>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>个人中心</span></div>
+      <span class="eyebrow">Profile</span>
+      <h1>个人中心</h1>
+      <p class="sub">上传你的专属头像，取一个喜欢的昵称，做星河里独一无二的那颗星。</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:44px 0 20px;">
+    <div class="toolbar">
+      <div class="userbar" id="userbar"></div>
+    </div>
+
+    <div class="redeem-grid">
+      <!-- 左侧：头像与昵称 -->
+      <div class="panel">
+        <h3>我的头像</h3>
+        <div style="display:flex;align-items:center;gap:20px;margin-bottom:18px;">
+          <div id="avatarPreview" style="width:84px;height:84px;border-radius:50%;overflow:hidden;border:1px solid var(--line-2);background:var(--bg);display:grid;place-items:center;flex:none;"></div>
+          <div style="flex:1;">
+            <button class="btn btn-block" id="btnPick" style="margin-bottom:8px;">选择图片上传</button>
+            <input type="file" id="fileInput" accept="image/*" style="display:none;">
+            <p class="hint" style="font-size:12px;color:var(--muted);">支持 JPG / PNG，建议正方形图片，最大 2MB。</p>
+          </div>
+        </div>
+
+        <h3>我的昵称</h3>
+        <div class="field">
+          <label for="nickInput">昵称（提交后需管理员审核）</label>
+          <div style="display:flex;gap:10px;">
+            <input type="text" id="nickInput" maxlength="12" placeholder="12 字以内">
+            <button class="btn btn-block" id="btnNick" style="width:auto;white-space:nowrap;">提交申请</button>
+          </div>
+          <p class="hint" id="nickStatus" style="font-size:12px;color:var(--muted);margin-top:5px;"></p>
+        </div>
+
+        <h3>我的简介</h3>
+        <div class="field">
+          <label for="bioInput">一句话介绍自己（120 字以内）</label>
+          <textarea class="mini" id="bioInput" rows="3" placeholder="写写你的座右铭、爱好，或想对班级说的话…" style="width:100%;min-height:72px;"></textarea>
+        </div>
+      </div>
+
+      <!-- 右侧：联系方式、账号与安全 -->
+      <div class="panel">
+        <h3>我的联系方式</h3>
+        <div class="field"><label>QQ</label><input class="mini" id="ctQQ" placeholder="QQ 号" style="width:100%;"></div>
+        <div class="field"><label>邮箱</label><input class="mini" id="ctEmail" placeholder="电子邮箱" style="width:100%;"></div>
+        <div class="field"><label>手机</label><input class="mini" id="ctPhone" placeholder="手机号" style="width:100%;"></div>
+        <button class="btn btn-block" id="btnSaveContact" style="max-width:160px;">保存联系方式</button>
+
+        <h3 style="margin-top:26px;">账号信息</h3>
+        <div class="ic-row" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--line-2);"><span style="color:var(--text-soft);font-family:var(--font-play);">姓名</span><b id="infoName">—</b></div>
+        <div class="ic-row" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--line-2);"><span style="color:var(--text-soft);font-family:var(--font-play);">账号</span><b id="infoAccount">—</b></div>
+        <div class="ic-row" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--line-2);"><span style="color:var(--text-soft);font-family:var(--font-play);">身份</span><b id="infoRole">—</b></div>
+        <div class="ic-row" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--line-2);"><span style="color:var(--text-soft);font-family:var(--font-play);">所属部门</span><b id="infoDept">—</b></div>
+        <div class="ic-row" style="display:flex;justify-content:space-between;padding:10px 0;"><span style="color:var(--text-soft);font-family:var(--font-play);">当前积分</span><b id="infoScore" style="font-family:var(--font-black);">—</b></div>
+
+        <h3 style="margin-top:26px;">修改密码</h3>
+        <div class="field">
+          <label for="newPwd">新密码</label>
+          <input type="password" id="newPwd" placeholder="不少于 4 位">
+        </div>
+        <div class="field">
+          <label for="newPwd2">确认新密码</label>
+          <input type="password" id="newPwd2" placeholder="再次输入">
+        </div>
+        <button class="btn btn-block" id="btnPwd">保存新密码</button>
+        <div id="adminEntry" style="margin-top:18px;display:none;">
+          <a href="admin.html" class="btn btn-block" style="background:#0a0a0a;color:#fff;">进入管理后台</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 我的图片 -->
+    <div class="panel" style="margin-top:22px;">
+      <h3>我的图片</h3>
+      <p class="hint" style="font-size:12px;color:var(--muted);margin-bottom:12px;">上传你喜欢的图片，用于个人展示（最多 12 张）。</p>
+      <button class="btn btn-block" id="btnAddImg" style="max-width:200px;margin-bottom:16px;">上传图片</button>
+      <input type="file" id="imgInput" accept="image/*" style="display:none;">
+      <div id="personalImgs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;"></div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="news.html">班级新闻</a></li>
+            <li><a href="gallery.html">班级相册</a></li>
+            <li><a href="honor.html">班级荣誉</a></li>
+            <li><a href="members.html">师生风采</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>关于</h4>
+          <ul>
+            <li><a href="index.html">返回首页</a></li>
+            <li><a href="class.html">了解我们</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>星聚成河 · 逐光而行</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/pwview.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    const s = STORE.getSession();
+    if (!s) { location.href = "identity.html"; return; }
+
+    const roleLabel = { admin: "班主任", teacher: "教师", monitor: "班委", superadmin: "超级管理员", student: "学生", parent: "家长", guest: "访客" }[s.role] || s.role;
+    const self = STORE.findById(s.id);
+
+    document.getElementById("userbar").innerHTML =
+      '<span class="u-name">' + esc(s.name) + '</span>' +
+      '<span class="u-role">' + roleLabel + '</span>';
+    document.getElementById("infoName").textContent = s.name;
+    document.getElementById("infoAccount").textContent = s.account;
+    document.getElementById("infoRole").textContent = roleLabel;
+    const dp = STORE.DEPTS[self.department];
+    document.getElementById("infoDept").textContent = self.department && dp
+      ? dp.name + (self.departmentRole === "minister" ? " · 部长" : " · 成员")
+      : "—";
+    const scoreEl = document.getElementById("infoScore");
+    if (self && (self.role === "student" || self.role === "superadmin")) {
+      scoreEl.textContent = STORE.fmtMoney(self.score) + " 分";
+      scoreEl.style.color = self.score < 0 ? "#b30000" : "var(--ink)";
+    } else {
+      scoreEl.textContent = "—";
+    }
+
+    // 超级/班主任可进入后台
+    if (STORE.isSuperAdmin(s.role)) document.getElementById("adminEntry").style.display = "";
+
+    // 加载联系方式与简介
+    document.getElementById("ctQQ").value = (self.contact && self.contact.qq) || "";
+    document.getElementById("ctEmail").value = (self.contact && self.contact.email) || "";
+    document.getElementById("ctPhone").value = (self.contact && self.contact.phone) || "";
+    document.getElementById("bioInput").value = self.bio || "";
+
+    function renderAvatar() {
+      const cur = STORE.refreshSession();
+      const preview = document.getElementById("avatarPreview");
+      if (cur && cur.avatar) {
+        preview.innerHTML = '<img src="' + cur.avatar + '" style="width:100%;height:100%;object-fit:cover;">';
+      } else {
+        preview.innerHTML = '<span style="font-family:var(--font-light);font-size:30px;color:var(--muted);">' + esc((s.name || "星").charAt(0)) + '</span>';
+      }
+    }
+    function renderNick() {
+      const u = STORE.findById(s.id);
+      const el = document.getElementById("nickStatus");
+      if (!u) return;
+      const cur = STORE.refreshSession();
+      if (u.nickPending) {
+        el.innerHTML = '当前昵称：<b>' + esc(cur.nickname || s.name) + '</b> ｜ 待审核昵称：<b>' + esc(u.nickPending) + '</b>（请等待管理员通过）';
+      } else if (cur.nickname) {
+        el.innerHTML = '当前昵称：<b>' + esc(cur.nickname) + '</b>';
+      } else {
+        el.innerHTML = '尚未设置昵称，将默认展示真实姓名。';
+      }
+      document.getElementById("nickInput").value = "";
+    }
+    function renderImgs() {
+      const u = STORE.findById(s.id);
+      const imgs = (u && u.personalImages) || [];
+      const host = document.getElementById("personalImgs");
+      if (!imgs.length) { host.innerHTML = '<p class="hint" style="color:var(--muted);grid-column:1/-1;">还没有上传图片。</p>'; return; }
+      host.innerHTML = imgs.map((im, i) =>
+        '<div style="position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;aspect-ratio:1;">' +
+        '<img src="' + im.src + '" style="width:100%;height:100%;object-fit:cover;">' +
+        '<button data-delimg="' + i + '" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:8px;padding:3px 9px;cursor:pointer;font-size:12px;">删除</button></div>'
+      ).join("");
+      host.querySelectorAll("[data-delimg]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认删除这张图片？")) return; STORE.deletePersonalImage(b.dataset.delimg); renderImgs(); }));
+    }
+
+    renderAvatar();
+    renderNick();
+    renderImgs();
+
+    // 保存联系方式+简介
+    document.getElementById("btnSaveContact").addEventListener("click", () => {
+      const r = STORE.updateProfile({
+        contact: {
+          qq: document.getElementById("ctQQ").value.trim(),
+          email: document.getElementById("ctEmail").value.trim(),
+          phone: document.getElementById("ctPhone").value.trim(),
+        },
+        bio: document.getElementById("bioInput").value,
+      });
+      alert(r.ok ? "已保存" : (r.msg || "保存失败"));
+    });
+
+    // 头像上传
+    const fileInput = document.getElementById("fileInput");
+    document.getElementById("btnPick").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      const f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      if (f.size > 2 * 1024 * 1024) { alert("图片过大，请选择 2MB 以内的图片"); return; }
+      const rd = new FileReader();
+      rd.onload = () => {
+        const r = STORE.setAvatar(rd.result);
+        if (r.ok) { alert("头像已更新"); renderAvatar(); }
+        else alert(r.msg);
+      };
+      rd.readAsDataURL(f);
+      fileInput.value = "";
+    });
+
+    // 昵称申请
+    document.getElementById("btnNick").addEventListener("click", () => {
+      const nick = document.getElementById("nickInput").value.trim();
+      const r = STORE.requestNickname(nick);
+      if (r.ok) { alert("昵称申请已提交，等待管理员审核"); renderNick(); }
+      else alert(r.msg);
+    });
+
+    // 个人图片上传
+    const imgInput = document.getElementById("imgInput");
+    document.getElementById("btnAddImg").addEventListener("click", () => imgInput.click());
+    imgInput.addEventListener("change", () => {
+      const f = imgInput.files && imgInput.files[0];
+      if (!f) return;
+      if (f.size > 2 * 1024 * 1024) { alert("图片过大，请选择 2MB 以内"); return; }
+      const rd = new FileReader();
+      rd.onload = () => {
+        const r = STORE.addPersonalImage(rd.result);
+        if (r.ok) { renderImgs(); } else alert(r.msg);
+      };
+      rd.readAsDataURL(f);
+      imgInput.value = "";
+    });
+
+    // 改密
+    document.getElementById("btnPwd").addEventListener("click", () => {
+      const p1 = document.getElementById("newPwd").value;
+      const p2 = document.getElementById("newPwd2").value;
+      if (!p1 || p1.length < 4) { alert("密码至少 4 位"); return; }
+      if (p1 !== p2) { alert("两次输入的密码不一致"); return; }
+      const r = STORE.changePassword(p1);
+      if (r.ok) { alert("密码已更新"); document.getElementById("newPwd").value = ""; document.getElementById("newPwd2").value = ""; }
+      else alert(r.msg);
+    });
+
+    function esc(v) { return String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  })();
+  </script>
+</body>
+</html>

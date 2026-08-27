@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班网站 · 选择身份">
+  <title>选择身份 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <main class="auth-wrap">
+    <div class="auth-card" style="max-width:440px;">
+      <span class="win-tl"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+      <div class="auth-logo"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'"></div>
+      <h1 class="auth-title">星河班</h1>
+      <p class="auth-sub">昆三中度假学校 · 八年级一班</p>
+      <p class="auth-sub" style="margin-top:-6px;opacity:.7;">请选择你的身份进入</p>
+
+      <div style="display:grid;gap:14px;margin-top:26px;">
+        <!-- 班内成员：学生 / 老师 / 班委 / 班主任（已有账号） -->
+        <a href="login.html" class="id-card">
+          <span class="id-badge">已有账号 · 登录</span>
+          <span class="id-name">我是班内成员</span>
+          <span class="id-desc">学生、老师、班委或班主任，用你的姓名 + 密码登录，进入各自的个人空间。</span>
+        </a>
+        <!-- 家长：没有账号就去注册 -->
+        <a href="register.html?role=parent" class="id-card">
+          <span class="id-badge">没有账号 · 去注册</span>
+          <span class="id-name">我是家长</span>
+          <span class="id-desc">注册并关联您的孩子（需班主任审核），审核通过后用下方入口登录。</span>
+        </a>
+        <!-- 访客：没有账号就去注册 -->
+        <a href="register.html?role=guest" class="id-card">
+          <span class="id-badge">没有账号 · 去注册</span>
+          <span class="id-name">我是访客</span>
+          <span class="id-desc">注册后浏览班级公开内容（需班主任审核），审核通过后用下方入口登录。</span>
+        </a>
+      </div>
+
+      <!-- 已有账号的家长 / 访客 直接登录 -->
+      <div style="display:grid;gap:14px;margin-top:22px;">
+        <a href="login.html" class="id-card id-card-guest-login">
+          <span class="id-badge">已有账号 · 登录</span>
+          <span class="id-name">我是家长 / 访客</span>
+          <span class="id-desc">已经提交过注册申请并通过审核？在这里登录进入星河班。</span>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/store.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    // 已登录则直接回首页（无需再选身份）
+    if (STORE.getSession()) { location.href = "index.html"; }
+
+    // 透传来源页，登录/注册后返回原页面
+    const next = new URLSearchParams(location.search).get("next");
+    const qs = next ? "?next=" + encodeURIComponent(next) : "";
+    const lk = document.querySelectorAll(".id-card");
+    if (lk[0]) lk[0].href = "login.html" + qs;
+    if (lk[1]) lk[1].href = "register.html?role=parent" + (next ? "&next=" + encodeURIComponent(next) : "");
+    if (lk[2]) lk[2].href = "register.html?role=guest" + (next ? "&next=" + encodeURIComponent(next) : "");
+    if (lk[3]) lk[3].href = "login.html" + qs;
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班操行银行 · 积分兑换">
+  <title>积分兑换 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <ul>
+          <li><a href="index.html">首页</a></li>
+          <li><a href="class.html">班级介绍</a></li>
+          <li><a href="news.html">班级新闻</a></li>
+          <li><a href="gallery.html">班级相册</a></li>
+          <li><a href="honor.html">班级荣誉</a></li>
+          <li><a href="members.html">师生风采</a></li>
+        </ul>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:40px; padding-bottom:80px;">
+    <div class="toolbar">
+      <div>
+        <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>积分兑换</span></div>
+        <h1 class="page-title" style="font-size:30px; margin-top:6px;">积分兑换</h1>
+      </div>
+      <div class="userbar" id="userbar"></div>
+    </div>
+
+    <div class="redeem-grid">
+      <!-- 左：我的信息 + 申请 -->
+      <div id="studentPanel"></div>
+      <!-- 右：审批 / 线下扣分（教师班委管理） -->
+      <div id="teacherPanel" style="display:none;"></div>
+    </div>
+  </main>
+
+  <script src="js/store.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/redeem.js"></script>
+</body>
+</html>

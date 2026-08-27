@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班 · 管理后台 —— 用户、昵称、兑换与新闻管理">
+  <title>管理后台 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .admin-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:24px; }
+    .admin-tabs button { padding:9px 18px; border-radius:999px; border:1px solid var(--line-2); background:#fff; color:var(--text-soft); font-size:13.5px; cursor:pointer; font-family:var(--font-body); transition:all .2s; }
+    .admin-tabs button:hover { border-color:var(--ink); color:var(--ink); }
+    .admin-tabs button.active { background:#000; color:#fff; border-color:#000; }
+    .admin-section { display:none; }
+    .admin-section.show { display:block; }
+    .admin-table { width:100%; border-collapse:collapse; background:var(--card-solid); border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-sm); }
+    .admin-table th,.admin-table td { padding:13px 16px; text-align:left; font-size:14px; border-bottom:1px solid var(--line); }
+    .admin-table thead th { background:var(--bg); font-family:var(--font-play); font-size:12.5px; letter-spacing:.05em; color:var(--text-soft); font-weight:400; }
+    .admin-table tbody tr:last-child td { border-bottom:none; }
+    .admin-avatar { width:34px; height:34px; border-radius:50%; overflow:hidden; background:var(--bg); display:inline-grid; place-items:center; font-family:var(--font-light); color:var(--muted); border:1px solid var(--line); }
+    .admin-avatar img { width:100%; height:100%; object-fit:cover; }
+    .muted-note { font-size:13px; color:var(--muted); }
+    select.mini, input.mini, textarea.mini { padding:8px 11px; font-size:13px; border:1px solid var(--line-2); border-radius:10px; background:#fff; font-family:var(--font-body); }
+    textarea.mini { width:100%; min-height:96px; resize:vertical; }
+    .stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-bottom:28px; }
+    @media (max-width:720px){ .stat-row{ grid-template-columns:repeat(2,1fr); } }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <ul>
+          <li><a href="index.html">首页</a></li>
+          <li><a href="class.html">班级介绍</a></li>
+          <li><a href="news.html">班级新闻</a></li>
+          <li><a href="gallery.html">班级相册</a></li>
+          <li><a href="honor.html">班级荣誉</a></li>
+          <li><a href="members.html">师生风采</a></li>
+          <li><a href="bank.html">操行银行</a></li>
+        </ul>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>管理后台</span></div>
+      <span class="eyebrow">Admin Console</span>
+      <h1>管理后台</h1>
+      <p class="sub">用户与角色、昵称审核、兑换审批、新闻发布——一站式管理星河班。</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:44px 0 20px;">
+    <div class="toolbar">
+      <div class="userbar" id="userbar"></div>
+    </div>
+
+    <div class="admin-tabs" id="adminTabs">
+      <button data-tab="dash" class="active">概览</button>
+      <button data-tab="users">用户管理</button>
+      <button data-tab="registrations">注册审核</button>
+      <button data-tab="dept">部门 · 荣誉</button>
+      <button data-tab="nicks">昵称审核</button>
+      <button data-tab="redeems">兑换审批</button>
+      <button data-tab="news">新闻管理</button>
+      <button data-tab="votes">投票</button>
+      <button data-tab="logs">操作日志</button>
+    </div>
+
+    <!-- 概览 -->
+    <section class="admin-section show" id="tab-dash">
+      <div class="stat-row" id="dashStats"></div>
+      <div class="panel">
+        <h3>操作提示</h3>
+        <ul style="margin-left:20px;color:var(--text-soft);font-size:14.5px;">
+          <li>「用户管理」可调整成员角色、重置初始密码。</li>
+          <li>「昵称审核」处理同学们提交的昵称申请。</li>
+          <li>「兑换审批」批准或驳回兑换申请，通过后自动扣分。</li>
+          <li>「新闻管理」发布班级新闻，内容请以《星河小报》为准。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 用户管理 -->
+    <section class="admin-section" id="tab-users">
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <table class="admin-table">
+          <thead>
+            <tr><th>成员</th><th>账号</th><th>角色</th><th>积分</th><th>昵称</th><th>部门 · 职务</th><th>操作</th></tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 注册审核 -->
+    <section class="admin-section" id="tab-registrations">
+      <div class="panel">
+        <h3>家长 / 访客注册审核</h3>
+        <p class="muted-note" style="margin-bottom:14px;">审核通过后方可登录。家长会关联其选择的孩子。</p>
+        <div id="registrationsBody"></div>
+      </div>
+    </section>
+
+    <!-- 昵称审核 -->
+    <section class="admin-section" id="tab-nicks">
+      <div class="panel">
+        <h3>待审核昵称</h3>
+        <div id="nicksBody"></div>
+      </div>
+    </section>
+
+    <!-- 兑换审批 -->
+    <section class="admin-section" id="tab-redeems">
+      <div class="panel">
+        <h3>待审批兑换</h3>
+        <div id="redeemsBody"></div>
+      </div>
+    </section>
+
+    <!-- 新闻管理 -->
+    <section class="admin-section" id="tab-news">
+      <div class="panel" style="margin-bottom:22px;">
+        <h3>发布新闻</h3>
+        <div class="field"><label>标题</label><input class="mini" id="newsTitle" placeholder="新闻标题" style="width:100%;"></div>
+        <div class="field"><label>日期（可选）</label><input class="mini" id="newsDate" placeholder="如 2026-05-20" style="width:100%;"></div>
+        <div class="field"><label>正文</label><textarea class="mini" id="newsContent" placeholder="新闻正文内容"></textarea></div>
+        <button class="btn btn-block" id="btnAddNews">发布</button>
+      </div>
+      <div class="panel">
+        <h3>已发布新闻</h3>
+        <div id="newsBody"></div>
+      </div>
+    </section>
+  <!-- 部门 · 荣誉 -->
+    <section class="admin-section" id="tab-dept">
+      <div class="panel" style="margin-bottom:22px;">
+        <h3>部门与职务分配</h3>
+        <p class="muted-note" style="margin-bottom:12px;">给成员分配所属部门（宣传部/纪检部/编辑部/医疗部/市场监督管理局）与部门职务（成员 / 部长）。部长可审批本部门内容发布，市监局负责审批营业执照与商品。</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;" id="deptAssign"></div>
+      </div>
+
+      <div class="panel" style="margin-bottom:22px;">
+        <h3>荣誉称号授予</h3>
+        <p class="muted-note" style="margin-bottom:12px;">为成员授予专属称号（如 最佳小编、纪律之星…），展示在成长档案。</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <select class="mini" id="bdgUser" style="flex:1;min-width:160px;"></select>
+          <input class="mini" id="bdgName" placeholder="称号名称" style="flex:1;min-width:160px;">
+          <button class="btn" id="btnGrantBdg">授予</button>
+        </div>
+        <div id="badgeManage"></div>
+      </div>
+
+      <div class="panel">
+        <h3>小组维护</h3>
+        <p class="muted-note" style="margin-bottom:12px;">组长已登记（李张涵 杨骐雨 闫熙曼 康寇佳琪 李欣桐 李俊娴 柴丽欣），开学后在此把同学拉进对应小组。</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <select class="mini" id="grpUser" style="flex:1;min-width:160px;"></select>
+          <select class="mini" id="grpPick" style="flex:1;min-width:160px;"></select>
+          <button class="btn" id="btnAssignGrp">分配</button>
+        </div>
+        <div id="groupManage"></div>
+      </div>
+    </section>
+
+    <!-- 投票 -->
+    <section class="admin-section" id="tab-votes">
+      <div class="panel" style="margin-bottom:22px;">
+        <h3>发起投票</h3>
+        <div class="field"><label>标题</label><input class="mini" id="admVtTitle" style="width:100%;"></div>
+        <div class="field"><label>截止日期（可选）</label><input class="mini" type="date" id="admVtDeadline" style="width:100%;"></div>
+        <div class="field"><label>选项（每行一个，至少 2 个）</label><textarea class="mini" id="admVtOptions" rows="4"></textarea></div>
+        <div class="field"><label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="admVtMulti"> 允许多选</label></div>
+        <button class="btn btn-block" id="btnAdmCreateVote" style="max-width:200px;">发起</button>
+      </div>
+      <div class="panel">
+        <h3>已发布投票</h3>
+        <div id="adminVoteList"></div>
+      </div>
+    </section>
+  <!-- 操作日志 -->
+    <section class="admin-section" id="tab-logs">
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+          <h3 style="margin:0;">管理员操作日志</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select class="mini" id="logFilter" style="width:150px;">
+              <option value="">全部成员</option>
+            </select>
+            <button class="btn-outline" id="btnClearLogs">清空日志</button>
+          </div>
+        </div>
+        <p class="muted-note" style="margin-bottom:14px;">记录所有管理员（班主任 / 教师 / 班委 · 超管）在什么时间操作了什么，仅最高级管理员可查看。清空仅超级管理员可用。</p>
+        <div id="logsBody"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="news.html">班级新闻</a></li>
+            <li><a href="gallery.html">班级相册</a></li>
+            <li><a href="honor.html">班级荣誉</a></li>
+            <li><a href="members.html">师生风采</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>关于</h4>
+          <ul>
+            <li><a href="index.html">返回首页</a></li>
+            <li><a href="class.html">了解我们</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>星聚成河 · 逐光而行</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    const s = STORE.getSession();
+    if (!s) { location.href = "login.html"; return; }
+    if (!STORE.isSuperAdmin(s.role)) { alert("你没有访问管理后台的权限"); location.href = "bank.html"; return; }
+
+    const roleLabel = { admin: "班主任", teacher: "教师", monitor: "班委", superadmin: "超级管理员", student: "学生", parent: "家长", guest: "访客" };
+    const roleOrder = { superadmin: 0, admin: 1, teacher: 2, monitor: 3, student: 4, parent: 5, guest: 6 };
+
+    document.getElementById("userbar").innerHTML =
+      '<a href="bank.html" style="font-size:13.5px;color:var(--text-soft);">操行银行</a>' +
+      '<a href="profile.html" style="font-size:13.5px;color:var(--text-soft);">个人中心</a>' +
+      '<span class="u-name">' + esc(s.name) + '</span>' +
+      '<span class="u-role">' + (roleLabel[s.role] || s.role) + '</span>' +
+      '<button id="btnLogout">退出</button>';
+    document.getElementById("btnLogout").addEventListener("click", () => { STORE.logout(); location.href = "login.html"; });
+
+    /* ---- 标签切换 ---- */
+    const tabs = document.querySelectorAll("#adminTabs button");
+    tabs.forEach((b) => b.addEventListener("click", () => {
+      tabs.forEach((x) => x.classList.remove("active"));
+      b.classList.add("active");
+      document.querySelectorAll(".admin-section").forEach((sec) => sec.classList.remove("show"));
+      document.getElementById("tab-" + b.dataset.tab).classList.add("show");
+      renderAll();
+    }));
+
+    function avatarHtml(u) {
+      if (u.avatar) return '<span class="admin-avatar"><img src="' + u.avatar + '" alt=""></span>';
+      return '<span class="admin-avatar">' + esc((u.name || "星").charAt(0)) + '</span>';
+    }
+    function dispName(u) { return u.nickname || u.name; }
+
+    /* ---- 概览 ---- */
+    function renderDash() {
+      const users = STORE.getUsers();
+      const nickPending = users.filter((u) => u.nickPending).length;
+      const redeemPending = STORE.getRedeems().filter((r) => r.status === "pending").length;
+      const newsCount = STORE.getNews().length;
+      const stat = (num, label) =>
+        '<div class="stat-card reveal" style="text-align:left;"><div class="stat-num" style="font-size:34px;">' + num + '</div><div class="stat-label">' + label + '</div></div>';
+      document.getElementById("dashStats").innerHTML =
+        stat(users.length, "注册成员") + stat(nickPending, "待审昵称") + stat(redeemPending, "待审兑换") + stat(newsCount, "已发布新闻");
+    }
+
+    /* ---- 用户管理 ---- */
+    function renderUsers() {
+      const users = STORE.getUsers();
+      users.sort((a, b) => (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9) || a.name.localeCompare(b.name, "zh"));
+      const deptSelect = (u) =>
+        '<select class="mini" data-dept="' + u.id + '" style="max-width:150px;">' +
+        '<option value="">（无部门）</option>' +
+        Object.keys(STORE.DEPTS).map((k) => '<option value="' + k + '" ' + (u.department === k ? "selected" : "") + '>' + STORE.DEPTS[k].name + '</option>').join("") +
+        '</select>';
+      const roleSelect = (u) =>
+        '<select class="mini" data-dept-role="' + u.id + '" style="max-width:84px;" ' + (u.department ? "" : "disabled") + '>' +
+        '<option value="member" ' + (u.departmentRole === "member" ? "selected" : "") + '>成员</option>' +
+        '<option value="minister" ' + (u.departmentRole === "minister" ? "selected" : "") + '>部长</option>' +
+        '</select>';
+
+      document.getElementById("usersBody").innerHTML = users.map((u) => `
+        <tr data-uid="${u.id}">
+          <td><span style="display:inline-flex;align-items:center;gap:10px;">${avatarHtml(u)}<span class="rank-name">${esc(u.name)}</span>${u.superadmin ? '<span class="pc-role" style="margin-left:6px;">超管</span>' : ''}</span></td>
+          <td>${esc(u.account)}</td>
+          <td>
+            <select class="mini" data-role="${u.id}">
+              ${["student","monitor","teacher","admin","superadmin","parent","guest"].map((r) => `<option value="${r}" ${u.role === r ? "selected" : ""}>${roleLabel[r]}</option>`).join("")}
+            </select>
+          </td>
+          <td>${(u.role === "student" || u.role === "superadmin") ? STORE.fmtMoney(u.score) : "—"}</td>
+          <td class="muted-note">${esc(dispName(u))}</td>
+          <td>${(u.role === "student" || u.role === "monitor" || u.role === "superadmin") ? '<div style="display:flex;gap:6px;">' + deptSelect(u) + roleSelect(u) + "</div>" : '<span class="muted-note">—</span>'}</td>
+          <td><button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" data-reset="${u.id}">重置密码</button></td>
+        </tr>`).join("");
+
+      document.querySelectorAll("[data-role]").forEach((sel) => {
+        sel.addEventListener("change", () => {
+          const r = STORE.adminUpdateRole(sel.dataset.role, sel.value);
+          if (!r.ok) alert(r.msg);
+          else { alert("角色已更新"); renderUsers(); }
+        });
+      });
+      document.querySelectorAll("[data-dept]").forEach((sel) => {
+        sel.addEventListener("change", () => {
+          const uid = sel.dataset.dept;
+          const roleSel = document.querySelector('[data-dept-role="' + uid + '"]');
+          const r = STORE.adminUpdateDept(uid, sel.value, sel.value && roleSel ? (roleSel.value || "member") : "");
+          alert(r.ok ? "部门已更新" : r.msg);
+          renderUsers();
+          if (typeof renderDept === "function") renderDept();
+        });
+      });
+      document.querySelectorAll("[data-dept-role]").forEach((sel) => {
+        sel.addEventListener("change", () => {
+          const uid = sel.dataset.deptRole;
+          const deptSel = document.querySelector('[data-dept="' + uid + '"]');
+          const r = STORE.adminUpdateDept(uid, deptSel ? deptSel.value : "", sel.value);
+          alert(r.ok ? "职务已更新" : r.msg);
+          renderUsers();
+          if (typeof renderDept === "function") renderDept();
+        });
+      });
+      document.querySelectorAll("[data-reset]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (!confirm("确认将该用户密码重置为默认 123456？")) return;
+          const r = STORE.adminResetPassword(btn.dataset.reset);
+          if (r.ok) alert("已重置为 123456，该用户下次登录需重新设置密码");
+          else alert(r.msg);
+        });
+      });
+    }
+
+    /* ---- 注册审核 ---- */
+    function renderRegistrations() {
+      const list = STORE.pendingRegistrations();
+      if (!list.length) {
+        document.getElementById("registrationsBody").innerHTML = '<p class="muted-note">暂无待审核的家长/访客注册申请。</p>';
+        return;
+      }
+      const statusLabel = { pending: "待审核", approved: "已通过", rejected: "已驳回" };
+      document.getElementById("registrationsBody").innerHTML = list.map((u) => {
+        const isPar = u.role === "parent";
+        const child = isPar && u.studentName ? ' · 关联孩子：' + esc(u.studentName) : "";
+        const actions = u.status === "pending"
+          ? '<button class="btn-outline" style="padding:6px 14px;font-size:12.5px;margin-right:6px;" data-rok="' + u.id + '">通过</button>' +
+            '<button class="btn-outline" style="padding:6px 14px;font-size:12.5px;" data-rno="' + u.id + '">驳回</button>'
+          : '<span class="muted-note">' + (statusLabel[u.status] || u.status) + '</span>';
+        return `<div class="redeem-item" data-uid="${u.id}">
+          <div class="ri-body"><b>${esc(u.name)}</b> · <span class="pc-role" style="font-size:10.5px;">${isPar ? "家长" : "访客"}</span><div class="ri-cost">账号 ${esc(u.account)} · ${STORE.fmtTime(u.registerTs)}${child}</div></div>
+          ${actions}
+        </div>`;
+      }).join("");
+      document.querySelectorAll("[data-rok]").forEach((b) => b.addEventListener("click", () => { STORE.reviewRegister(b.dataset.rok, true); alert("已通过审核"); renderRegistrations(); renderDash(); }));
+      document.querySelectorAll("[data-rno]").forEach((b) => b.addEventListener("click", () => { STORE.reviewRegister(b.dataset.rno, false); alert("已驳回"); renderRegistrations(); }));
+    }
+
+    /* ---- 昵称审核 ---- */
+    function renderNicks() {
+      const list = STORE.pendingNicknames();
+      if (!list.length) {
+        document.getElementById("nicksBody").innerHTML = '<p class="muted-note">暂无待审核昵称。</p>';
+        return;
+      }
+      document.getElementById("nicksBody").innerHTML = list.map((n) => `
+        <div class="redeem-item" data-uid="${n.id}">
+          <div class="ri-body"><b>${esc(n.name)}</b><div class="ri-cost">申请昵称：${esc(n.nickPending)}（当前：${esc(n.currentNick)}）</div></div>
+          <button class="btn-outline" style="padding:6px 14px;font-size:12.5px;margin-right:6px;" data-ok="${n.id}">通过</button>
+          <button class="btn-outline" style="padding:6px 14px;font-size:12.5px;" data-no="${n.id}">拒绝</button>
+        </div>`).join("");
+      document.querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", () => { STORE.reviewNickname(b.dataset.ok, true); alert("已通过"); renderNicks(); }));
+      document.querySelectorAll("[data-no]").forEach((b) => b.addEventListener("click", () => { STORE.reviewNickname(b.dataset.no, false); alert("已拒绝"); renderNicks(); }));
+    }
+
+    /* ---- 兑换审批 ---- */
+    function renderRedeems() {
+      const list = STORE.getRedeems().filter((r) => r.status === "pending");
+      if (!list.length) {
+        document.getElementById("redeemsBody").innerHTML = '<p class="muted-note">暂无待审批兑换。</p>';
+        return;
+      }
+      document.getElementById("redeemsBody").innerHTML = list.map((r) => `
+        <div class="redeem-item" data-id="${r.id}">
+          <div class="ri-body"><b>${esc(r.name)} · ${esc(r.item)}</b><div class="ri-cost">${r.cost} 分 · ${STORE.fmtTime(r.applyTs)}</div></div>
+          <button class="btn-outline" style="padding:6px 14px;font-size:12.5px;margin-right:6px;" data-ok="${r.id}">通过</button>
+          <button class="btn-outline" style="padding:6px 14px;font-size:12.5px;" data-no="${r.id}">拒绝</button>
+        </div>`).join("");
+      document.querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认通过并扣分？")) return; const r = STORE.reviewRedeem(b.dataset.ok, true); alert(r.msg || "已通过"); renderRedeems(); }));
+      document.querySelectorAll("[data-no]").forEach((b) => b.addEventListener("click", () => { const r = STORE.reviewRedeem(b.dataset.no, false); alert(r.msg || "已拒绝"); renderRedeems(); }));
+    }
+
+    /* ---- 新闻管理 ---- */
+    function renderNews() {
+      const list = STORE.getNews();
+      if (!list.length) {
+        document.getElementById("newsBody").innerHTML = '<p class="muted-note">暂无新闻。可参考《星河小报》内容编辑发布。</p>';
+        return;
+      }
+      document.getElementById("newsBody").innerHTML = list.map((n) => `
+        <div class="redeem-item">
+          <div class="ri-body"><b>${esc(n.title)}</b><div class="ri-cost">${n.date || STORE.fmtTime(n.ts)}</div></div>
+          <button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" data-del="${n.id}">删除</button>
+        </div>`).join("");
+      document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认删除该新闻？")) return; STORE.deleteNews(b.dataset.del); renderNews(); }));
+    }
+    document.getElementById("btnAddNews").addEventListener("click", () => {
+      const title = document.getElementById("newsTitle").value.trim();
+      const content = document.getElementById("newsContent").value.trim();
+      const date = document.getElementById("newsDate").value.trim();
+      if (!title || !content) { alert("标题与正文不能为空"); return; }
+      const r = STORE.addNews({ title, content, date: date || undefined });
+      if (r.ok) { alert("新闻已发布"); document.getElementById("newsTitle").value = ""; document.getElementById("newsContent").value = ""; document.getElementById("newsDate").value = ""; renderNews(); }
+      else alert(r.msg);
+    });
+
+    /* ---- 部门 · 荣誉 ---- */
+    function deptOpts() {
+      return Object.keys(STORE.DEPTS).map((k) => '<option value="' + k + '">' + STORE.DEPTS[k].name + "</option>").join("");
+    }
+    function renderDept() {
+      const users = STORE.getUsers().filter((u) => u.role !== "teacher" || u.department);
+      document.getElementById("deptAssign").innerHTML =
+        '<select class="mini" id="deptTarget" style="width:100%;">' +
+        users.map((u) => '<option value="' + u.id + '">' + (u.nickname || u.name) + '</option>').join("") + "</select>" +
+        '<select class="mini" id="deptPick" style="width:100%;"><option value="">（不设部门）</option>' + deptOpts() + "</select>" +
+        '<select class="mini" id="deptRolePick" style="width:100%;"><option value="member">成员</option><option value="minister">部长</option></select>' +
+        '<button class="btn" id="btnDeptAssign" style="width:100%;">保存部门分配</button>';
+      document.getElementById("btnDeptAssign").addEventListener("click", () => {
+        const r = STORE.adminUpdateDept(document.getElementById("deptTarget").value, document.getElementById("deptPick").value, document.getElementById("deptRolePick").value);
+        alert(r.ok ? "已保存" : r.msg); renderDept();
+      });
+
+      // 勋章授予对象
+      document.getElementById("bdgUser").innerHTML = STORE.getUsers().map((u) => '<option value="' + u.id + '">' + (u.nickname || u.name) + '</option>').join("");
+      renderBadges();
+
+      // 小组分配
+      document.getElementById("grpUser").innerHTML = STORE.getUsers().filter((u) => u.role !== "teacher").map((u) => '<option value="' + u.id + '">' + (u.nickname || u.name) + '</option>').join("");
+      document.getElementById("grpPick").innerHTML = '<option value="">（不分组）</option>' + STORE.getGroups().map((g) => '<option value="' + g.id + '">' + g.name + " · " + g.leaderName + '</option>').join("");
+      renderGroups();
+    }
+
+    function renderBadges() {
+      const uid = document.getElementById("bdgUser")?.value;
+      const u = STORE.getUsers().find((x) => x.id === uid);
+      const box = document.getElementById("badgeManage");
+      if (!u) { box.innerHTML = ""; return; }
+      box.innerHTML = '<p class="muted-note" style="margin-bottom:8px;">当前：' + esc(u.nickname || u.name) + " 已获称号</p>" +
+        (u.badges && u.badges.length
+          ? u.badges.map((b) => '<span class="badge-chip">✦ ' + esc(b.name) + ' <a href="javascript:;" data-revoke="' + b.id + '" style="color:#d33;font-size:12px;">×</a></span>').join("")
+          : '<p class="muted-note">暂无。</p>');
+      document.querySelectorAll("[data-revoke]").forEach((a) => a.addEventListener("click", () => { if (!confirm("撤销该称号？")) return; STORE.revokeBadge(uid, a.dataset.revoke); renderBadges(); }));
+    }
+    document.getElementById("btnGrantBdg").addEventListener("click", () => {
+      const uid = document.getElementById("bdgUser").value;
+      const name = document.getElementById("bdgName").value.trim();
+      if (!name) { alert("请输入称号名称"); return; }
+      const r = STORE.grantBadge(uid, name);
+      if (r.ok) { alert("已授予"); document.getElementById("bdgName").value = ""; renderBadges(); } else alert(r.msg);
+    });
+
+    function renderGroups() {
+      const gs = STORE.getGroups();
+      const stats = STORE.groupStats();
+      document.getElementById("groupManage").innerHTML = gs.map((g) => {
+        const st = stats.find((x) => x.id === g.id);
+        const members = [g.leaderId ? "组长 " + g.leaderName : ""].concat(g.members.map((m) => m.name)).filter(Boolean);
+        return '<div class="redeem-item"><div class="ri-body"><b>' + esc(g.name) + '</b><div class="ri-cost">' +
+          (st ? st.memberCount + " 人 · 总分 " + STORE.fmtMoney(st.scoreSum) : "") + '</div>' +
+          (members.length ? '<div class="ri-cost">' + members.map(esc).join("、") + "</div>" : "") + "</div></div>";
+      }).join("");
+    }
+    document.getElementById("btnAssignGrp").addEventListener("click", () => {
+      const r = STORE.setUserGroup(document.getElementById("grpUser").value, document.getElementById("grpPick").value);
+      alert(r.ok ? "已分配" : r.msg); renderGroups();
+    });
+
+    /* ---- 投票管理 ---- */
+    function renderAdminVotes() {
+      const list = STORE.getVotes();
+      if (!list.length) { document.getElementById("adminVoteList").innerHTML = '<p class="muted-note">暂无投票。</p>'; return; }
+      document.getElementById("adminVoteList").innerHTML = list.map((v) => `
+        <div class="redeem-item">
+          <div class="ri-body"><b>${esc(v.title)}</b><div class="ri-cost">${v.responses.length} 人已投${v.open ? " · 进行中" : " · 已结束"}</div></div>
+          ${v.open ? '<button class="btn-outline" data-cls="' + v.id + '" style="padding:6px 12px;font-size:12.5px;">结束</button>' : ""}
+        </div>`).join("");
+      document.querySelectorAll("[data-cls]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认结束？")) return; STORE.closeVote(b.dataset.cls); renderAdminVotes(); }));
+    }
+    document.getElementById("btnAdmCreateVote").addEventListener("click", () => {
+      const title = document.getElementById("admVtTitle").value.trim();
+      const opts = document.getElementById("admVtOptions").value.split("\n").map((o) => o.trim()).filter(Boolean);
+      if (!title) { alert("标题不能为空"); return; }
+      if (opts.length < 2) { alert("至少填写 2 个选项"); return; }
+      const r = STORE.createVote({ title, options: opts, allowMulti: document.getElementById("admVtMulti").checked, endDate: document.getElementById("admVtDeadline").value });
+      if (r.ok) { alert("投票已创建"); document.getElementById("admVtTitle").value = ""; document.getElementById("admVtOptions").value = ""; renderAdminVotes(); }
+      else alert(r.msg);
+    });
+
+    /* ---- 操作日志 ---- */
+    function renderLogs() {
+      const r = STORE.getLogs();
+      const body = document.getElementById("logsBody");
+      if (!r.ok) { body.innerHTML = '<p class="muted-note">' + esc(r.msg) + '</p>'; return; }
+      // 填充成员筛选
+      const filter = document.getElementById("logFilter");
+      const actors = [...new Set(r.list.map((l) => l.operator))];
+      const cur = filter.value;
+      filter.innerHTML = '<option value="">全部成员</option>' + actors.map((a) => '<option value="' + esc(a) + '" ' + (cur === a ? "selected" : "") + '>' + esc(a) + '</option>').join("");
+      const list = cur ? r.list.filter((l) => l.operator === cur) : r.list;
+      if (!list.length) { body.innerHTML = '<p class="muted-note">暂无操作记录。</p>'; return; }
+      const roleL = { superadmin: "超管", admin: "班主任", teacher: "教师", monitor: "班委", student: "学生", parent: "家长", guest: "访客" };
+      body.innerHTML = list.map((l) => `
+        <div class="redeem-item">
+          <div class="ri-body">
+            <b>${esc(l.operator)}</b> <span class="pc-role" style="font-size:10.5px;">${roleL[l.operatorRole] || l.operatorRole}</span>
+            <span style="margin-left:8px;">${esc(l.action)}</span>
+            ${l.detail ? '<div class="ri-cost">' + esc(l.detail) + '</div>' : ''}
+          </div>
+          <div class="ri-cost" style="white-space:nowrap;">${STORE.fmtTime(l.ts)}</div>
+        </div>`).join("");
+    }
+
+    const logFilter = document.getElementById("logFilter");
+    if (logFilter) logFilter.addEventListener("change", renderLogs);
+    document.getElementById("btnClearLogs").addEventListener("click", () => {
+      if (!confirm("确定清空全部操作日志？此操作不可恢复。")) return;
+      const r = STORE.clearLogs();
+      if (r.ok) alert("已清空操作日志"); else alert(r.msg);
+      renderLogs();
+    });
+
+    function renderAll() {
+      renderDash();
+      renderUsers();
+      renderRegistrations();
+      renderDept();
+      renderNicks();
+      renderRedeems();
+      renderNews();
+      renderAdminVotes();
+      renderLogs();
+    }
+    renderAll();
+
+    function esc(v) { return String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班 · 投票问卷 —— 一人一票，听每一个人的声音">
+  <title>投票 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav"><ul></ul></nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>投票</span></div>
+      <span class="eyebrow">Vote</span>
+      <h1>班级投票</h1>
+      <p class="sub">班委选举、活动方案、荣誉评选……一人一票，让每个人都作数。</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:40px 0 20px;">
+    <div class="toolbar">
+      <div class="userbar">
+        <span id="votePrompt" class="hint" style="font-size:12.5px;color:var(--text-soft);align-self:center;"></span>
+        <a href="profile.html" style="font-size:13px;color:var(--text-soft);">个人中心</a>
+        <a href="admin.html" style="font-size:13px;color:var(--text-soft);display:none;" id="voteAdminLink">后台</a>
+      </div>
+    </div>
+
+    <div class="panel" id="voteCreatePanel" style="display:none;margin-bottom:26px;">
+      <h3>发起投票</h3>
+      <div class="field"><label>标题</label><input class="mini" id="vtTitle" placeholder="投票标题" style="width:100%;"></div>
+      <div class="field"><label>截止日期（可选）</label><input class="mini" type="date" id="vtDeadline" style="width:100%;"></div>
+      <div class="field"><label>选项（每行一个，至少 2 个）</label><textarea class="mini" id="vtOptions" rows="4" placeholder="选项A&#10;选项B&#10;选项C"></textarea></div>
+      <div class="field"><label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="vtMulti"> 允许多选</label></div>
+      <button class="btn btn-block" id="btnCreateVote" style="max-width:220px;">发起投票</button>
+    </div>
+
+    <div id="voteList"></div>
+    <p class="muted-note" id="voteEmpty" style="display:none;">暂无投票。</p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="gallery.html">班级相册</a></li>
+            <li><a href="votes.html">投票</a></li>
+            <li><a href="messages.html">悄悄话墙</a></li>
+            <li><a href="archive.html">成长档案</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>星聚成河 · 逐光而行</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    const s = STORE.getSession();
+    if (!s) { location.href = "login.html"; return; }
+    const canManage = STORE.canManageVotes(s.role);
+    const canVote = s.role === "student" || s.role === "superadmin";
+
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+    if (STORE.isSuperAdmin(s.role)) document.getElementById("voteAdminLink").style.display = "";
+    if (canManage) {
+      document.getElementById("voteCreatePanel").style.display = "block";
+      document.getElementById("votePrompt").textContent = "你可以发起投票：";
+    }
+
+    function render() {
+      const list = STORE.getVotes();
+      const box = document.getElementById("voteList");
+      const empty = document.getElementById("voteEmpty");
+      if (!list.length) { box.innerHTML = ""; empty.style.display = "block"; return; }
+      empty.style.display = "none";
+
+      box.innerHTML = list.map((v) => {
+        const total = v.responses.length;
+        const mine = STORE.myVote(v.id);
+        const voted = !!mine;
+        const ended = !v.open;
+
+        const rows = v.options.map((o, i) => {
+          const pct = total ? Math.round((o.count / total) * 100) : 0;
+          const myPick = mine && mine.picks.includes(i);
+          let ctrl;
+          if (voted || ended) {
+            ctrl = `<div class="ri-cost">${o.count} 票 · ${pct}%</div>
+              <div style="background:var(--line);border-radius:8px;overflow:hidden;height:8px;margin-top:6px;"><div style="width:${pct}%;height:100%;background:#000;"></div></div>`;
+            if (myPick) ctrl += `<span class="pc-role" style="margin-left:6px;">我的选择</span>`;
+          } else {
+            ctrl = `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="${v.allowMulti ? "checkbox" : "radio"}" name="opt_${v.id}" value="${i}">
+              <span>${esc(o.text)}</span></label>`;
+          }
+          return `<div class="field" style="margin-bottom:10px;">${ctrl}</div>`;
+        }).join("");
+
+        const status = ended ? '<span class="pc-role">已结束</span>' : (voted ? '<span class="pc-role">你已投票</span>' : '<span class="pc-role">进行中</span>');
+        const actions = (!voted && !ended && canVote)
+          ? `<button class="btn btn-block" data-vote="${v.id}" data-multi="${v.allowMulti}" style="max-width:180px;">提交票</button>`
+          : (canManage && !ended ? `<button class="btn-outline" data-close="${v.id}" style="padding:6px 12px;font-size:12.5px;">结束投票</button>` : "");
+
+        return `
+        <div class="panel" style="margin-bottom:18px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+            <h3>${esc(v.title)}</h3>${status}
+          </div>
+          <div class="hint" style="font-size:12.5px;color:var(--text-soft);margin-bottom:14px;">
+            发起：${esc(v.createBy)} · ${total} 人已投${v.deadline ? " · 截止 " + esc(v.deadline) : ""}${v.allowMulti ? " · 多选" : " · 单选"}
+          </div>
+          ${rows}
+          ${actions}
+        </div>`;
+      }).join("");
+
+      box.querySelectorAll("[data-vote]").forEach((b) => {
+        b.addEventListener("click", function () {
+          const multi = b.dataset.multi === "true";
+          const selz = box.querySelectorAll('input[name="opt_' + b.dataset.vote + '"]:checked');
+          if (!selz.length) { alert("请先选择选项"); return; }
+          const picks = [...selz].map((x) => Number(x.value));
+          if (!multi && picks.length > 1) { alert("该投票为单选"); return; }
+          const r = STORE.castVote(b.dataset.vote, picks);
+          if (r.ok) { alert("投票成功，谢谢参与"); render(); } else alert(r.msg);
+        });
+      });
+      box.querySelectorAll("[data-close]").forEach((b) => {
+        b.addEventListener("click", () => { if (!confirm("确认结束该投票？")) return; STORE.closeVote(b.dataset.close); render(); });
+      });
+    }
+
+    document.getElementById("btnCreateVote").addEventListener("click", () => {
+      const title = document.getElementById("vtTitle").value.trim();
+      const optsText = document.getElementById("vtOptions").value;
+      const opts = optsText.split("\n").map((o) => o.trim()).filter(Boolean);
+      if (!title) { alert("标题不能为空"); return; }
+      if (opts.length < 2) { alert("至少填写 2 个选项"); return; }
+      const r = STORE.createVote({ title, options: opts, allowMulti: document.getElementById("vtMulti").checked, endDate: document.getElementById("vtDeadline").value });
+      if (r.ok) {
+        alert("投票已创建");
+        document.getElementById("vtTitle").value = ""; document.getElementById("vtOptions").value = ""; document.getElementById("vtDeadline").value = "";
+        render();
+      } else alert(r.msg);
+    });
+
+    render();
+  })();
+  </script>
+</body>
+</html>

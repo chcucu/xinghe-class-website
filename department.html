@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="星河班 · 部门事务">
+  <title>部门事务 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <ul></ul>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span id="crumbDept">部门事务</span></div>
+      <span class="eyebrow" id="eyebrowDept">Department</span>
+      <h1 id="deptTitle">部门事务</h1>
+      <p class="sub" id="deptDesc"></p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:40px 0 20px;">
+    <!-- 已发布内容 -->
+    <section>
+      <div class="section-head">
+        <span class="eyebrow">Published</span>
+        <h2 class="section-title" id="pubTitle">已发布</h2>
+      </div>
+      <div id="publishedList"></div>
+    </section>
+
+    <!-- 匿名举报（仅纪检部） -->
+    <section id="reportSec" style="display:none;">
+      <div class="panel" style="margin-top:34px;">
+        <h3>匿名举报</h3>
+        <p style="font-size:13px;color:var(--text-soft);margin-bottom:14px;">如需向纪检部反映问题，可在此匿名提交。仅纪检部成员可见，你的身份不会被泄露。</p>
+        <div class="field"><label>涉案人员</label><input class="mini" id="repTarget" placeholder="可选" style="width:100%;"></div>
+        <div class="field"><label>案情经过</label><textarea class="mini" id="repDetail" placeholder="请描述经过"></textarea></div>
+        <div class="field"><label>图片佐证（可选）</label><input type="file" id="repFile" accept="image/*" style="margin-bottom:8px;"><span class="hint" style="font-size:12px;color:var(--muted);" id="repFileHint"></span></div>
+        <div class="field"><label>其他说明</label><input class="mini" id="repOther" placeholder="其他需要补充的内容" style="width:100%;"></div>
+        <button class="btn btn-block" id="btnReport" style="max-width:220px;">提交举报</button>
+      </div>
+    </section>
+
+    <!-- 部门成员管理 -->
+    <section id="manageSec" style="display:none;">
+      <div class="panel" style="margin-top:34px;">
+        <h3 id="manageTitle">部门管理</h3>
+        <div class="admin-tabs" id="manageTabs">
+          <button data-mt="add" class="active">发布新内容</button>
+          <button data-mt="mytab">我的草稿 / 待审</button>
+          <button data-mt="reports">举报箱</button>
+        </div>
+        <!-- 发布新内容 -->
+        <div id="mt-add"></div>
+        <!-- 我的草稿列表 -->
+        <div id="mt-mytab" style="display:none;"></div>
+        <!-- 举报箱（纪检） -->
+        <div id="mt-reports" style="display:none;"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="news.html">班级新闻</a></li>
+            <li><a href="gallery.html">班级相册</a></li>
+            <li><a href="honor.html">班级荣誉</a></li>
+            <li><a href="members.html">师生风采</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>关于</h4>
+          <ul>
+            <li><a href="index.html">返回首页</a></li>
+            <li><a href="class.html">了解我们</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>博学笃行，逐梦星河</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    const deptId = new URLSearchParams(location.search).get("dept") || "";
+    const conf = STORE.DEPTS[deptId];
+    if (!conf) { location.href = "index.html"; return; }
+
+    const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const s = STORE.getSession();
+    const canEdit = STORE.canEditDept(deptId);
+    const canApprove = STORE.canApproveDept(deptId);
+    const isJiwei = deptId === "jiwei";
+    const isBianji = deptId === "bianji";
+    const isYiliao = deptId === "yiliao";
+
+    // 倒排：新→旧，但 published 置顶
+    function sortItems(list) {
+      const order = { published: 0, pending: 1, rejected: 2, draft: 3 };
+      return list.slice().sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || new Date(b.createdTs) - new Date(a.createdTs));
+    }
+
+    // 字段 schema
+    function schema() {
+      if (deptId === "jiwei") return [
+        { key: "title", label: "案件标题", type: "text" },
+        { key: "targets", label: "涉案人员", type: "text" },
+        { key: "detail", label: "案件经过与处理结果", type: "textarea" },
+        { key: "evidence", label: "图片佐证", type: "file" },
+        { key: "notes", label: "备注", type: "text" },
+      ];
+      if (deptId === "bianji") return [
+        { key: "title", label: "标题", type: "text" },
+        { key: "issue", label: "期号", type: "text" },
+        { key: "cover", label: "封面图", type: "file" },
+        { key: "content", label: "正文", type: "textarea" },
+      ];
+      return [
+        { key: "title", label: "标题", type: "text" },
+        { key: "content", label: "正文", type: "textarea" },
+      ];
+    }
+
+    // 卡片渲染
+    function card(item) {
+      const st = item.status === "published" ? "已发布" : item.status === "pending" ? "待部长审核" : item.status === "rejected" ? "已驳回" : "草稿";
+      let body = "";
+      if (item.title) body += '<h3 style="font-size:20px;margin-bottom:8px;">' + esc(item.title) + '</h3>';
+      if (isBianji && item.issue) body += '<div class="pc-role" style="margin-bottom:8px;">第 ' + esc(item.issue) + ' 期</div>';
+      if (deptId === "jiwei" && item.targets) body += '<p style="font-size:13px;color:var(--text-soft);margin:4px 0;"><b>涉案人员：</b>' + esc(item.targets) + '</p>';
+      if (item.detail) body += '<p style="font-size:14px;line-height:1.8;color:var(--ink);white-space:pre-wrap;">' + esc(item.detail) + '</p>';
+      if (item.content) body += '<p style="font-size:14px;line-height:1.8;color:var(--ink);white-space:pre-wrap;">' + esc(item.content) + '</p>';
+      if (item.notes) body += '<p style="font-size:13px;color:var(--muted);margin-top:8px;">' + esc(item.notes) + '</p>';
+      let imgs = "";
+      (item.cover ? [item.cover] : []).concat(item.evidence || []).forEach(function (src) {
+        if (src) imgs += '<img src="' + src + '" alt="佐证" style="max-width:220px;max-height:160px;border-radius:10px;object-fit:cover;margin:6px 6px 0 0;border:1px solid var(--line);">';
+      });
+      const author = esc(item.authorName || item.author);
+      return '<div class="panel" style="margin-bottom:16px;">' + body + (imgs ? '<div style="display:flex;flex-wrap:wrap;">' + imgs + '</div>' : "") +
+        '<div class="ri-cost" style="margin-top:10px;">' + STORE.fmtTime(item.createdTs) + ' · ' + author + ' · <span class="chip-status ' + item.status + '">' + st + '</span></div></div>';
+    }
+
+    // 已发布区
+    document.getElementById("crumbDept").textContent = conf.name;
+    document.getElementById("eyebrowDept").textContent = conf.name;
+    document.getElementById("deptTitle").textContent = conf.title;
+    document.getElementById("deptDesc").textContent = conf.desc;
+    document.getElementById("pubTitle").textContent = conf.name + " · 已发布";
+
+    function renderPublished() {
+      const list = sortItems(STORE.getDeptItems(deptId).filter((x) => x.status === "published"));
+      document.getElementById("publishedList").innerHTML = list.length
+        ? list.map(card).join("")
+        : '<div class="empty-state" style="text-align:center;padding:50px 20px;color:var(--text-soft);">' + conf.name + ' 暂无已发布内容。</div>';
+    }
+
+    // 举报（纪检公开提交）
+    if (isJiwei) {
+      document.getElementById("reportSec").style.display = "";
+      let repEvidence = [];
+      document.getElementById("btnReport").addEventListener("click", () => {
+        const r = STORE.submitReport({
+          target: document.getElementById("repTarget").value.trim(),
+          detail: document.getElementById("repDetail").value.trim(),
+          evidence: repEvidence,
+          other: document.getElementById("repOther").value.trim(),
+        });
+        alert(r.msg || "提交成功");
+        if (r.ok) {
+          document.getElementById("repTarget").value = "";
+          document.getElementById("repDetail").value = "";
+          document.getElementById("repOther").value = "";
+          document.getElementById("repFileHint").textContent = "";
+          repEvidence = [];
+        }
+      });
+      document.getElementById("repFile").addEventListener("change", function () {
+        const f = this.files && this.files[0];
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => { repEvidence.push(rd.result); document.getElementById("repFileHint").textContent = "已添加 " + repEvidence.length + " 张佐证"; };
+        rd.readAsDataURL(f);
+        this.value = "";
+      });
+    }
+
+    // 管理端
+    if (canEdit) {
+      document.getElementById("manageSec").style.display = "";
+      document.getElementById("manageTitle").textContent = conf.name + " · 部门管理";
+      if (!isJiwei) document.querySelector('[data-mt="reports"]').style.display = "none";
+
+      const tabBtns = Array.from(document.querySelectorAll("#manageTabs button"));
+      function switchTab(tab) {
+        tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.mt === tab));
+        document.getElementById("mt-add").style.display = tab === "add" ? "" : "none";
+        document.getElementById("mt-mytab").style.display = tab === "mytab" ? "" : "none";
+        const rp = document.getElementById("mt-reports");
+        if (rp) { rp.style.display = (tab === "reports" && isJiwei) ? "" : "none"; }
+        if (tab === "add") renderAddForm();
+        if (tab === "mytab") renderMyTab();
+        if (tab === "reports" && isJiwei) renderReports();
+      }
+      tabBtns.forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.mt)));
+
+      // 发布表单
+      function renderAddForm() {
+        const fields = schema();
+        document.getElementById("mt-add").innerHTML = fields.map((f, i) =>
+          f.type === "textarea"
+            ? '<div class="field"><label>' + f.label + '</label><textarea class="mini" data-k="' + f.key + '" style="min-height:96px;"></textarea></div>'
+            : f.type === "file"
+              ? '<div class="field"><label>' + f.label + '（自定义上传）</label><input type="file" accept="image/*" class="mini" data-k="' + f.key + '" data-file="1"><span class="hint" style="font-size:12px;color:var(--muted);" data-hint="' + f.key + '"></span></div>'
+              : '<div class="field"><label>' + f.label + '</label><input class="mini" data-k="' + f.key + '" style="width:100%;"></div>'
+        ).join("") +
+          '<button class="btn btn-block" id="btnPublish" style="max-width:200px;">提交</button>';
+        // 文件上传
+        document.querySelectorAll("[data-file]").forEach((inp) => {
+          const k = inp.dataset.k;
+          const hint = document.querySelector('[data-hint="' + k + '"]');
+          inp.addEventListener("change", function () {
+            const f = this.files && this.files[0];
+            if (!f) return;
+            const rd = new FileReader();
+            rd.onload = () => { inp._val = rd.result; if (hint) hint.textContent = "已上传"; };
+            rd.readAsDataURL(f);
+          });
+        });
+        document.getElementById("btnPublish").addEventListener("click", () => {
+          const fields = {};
+          document.querySelectorAll("#mt-add [data-k]").forEach((el) => {
+            fields[el.dataset.k] = el.dataset.file ? (el._val || "") : el.value.trim();
+          });
+          if ((deptId === "bianji" || deptId === "yiliao") && !fields.title) { alert("请填写标题"); return; }
+          if (isJiwei && !fields.title && !fields.detail) { alert("请填写案件标题或经过"); return; }
+          const r = STORE.addDeptItem(deptId, fields);
+          alert(r.msg || (r.ok ? "已提交" : "失败"));
+          if (r.ok) { renderAddForm(); renderPublished(); renderMyTab(); }
+        });
+      }
+
+      // 我的草稿 / 全部待处理（部长可审核/删除）
+      function renderMyTab() {
+        const s2 = STORE.getSession();
+        const mine = STORE.getDeptItems(deptId).filter((x) => canApprove || x.authorId === s2.id);
+        const host = document.getElementById("mt-mytab");
+        if (!mine.length) { host.innerHTML = '<p class="muted-note">暂无草稿或待审核内容。</p>'; return; }
+        host.innerHTML = sortItems(mine).map((it) => {
+          const stLabel = it.status === "published" ? "已发布" : it.status === "pending" ? "待审核" : it.status === "rejected" ? "已驳回" : "草稿";
+          return '<div class="redeem-item">' +
+            '<div class="ri-body"><b>' + esc(it.title || "(未命名)") + '</b><div class="ri-cost">' + stLabel + ' · ' + STORE.fmtTime(it.createdTs) + '</div></div>' +
+            (canApprove && it.status === "pending" ? '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;margin-right:6px;" data-ok="' + it.id + '">通过</button><button class="btn-outline" style="padding:6px 12px;font-size:12.5px;margin-right:6px;" data-no="' + it.id + '">驳回</button>' : "") +
+            (canApprove ? '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" data-del="' + it.id + '">删除</button>' : "") +
+            '</div>';
+        }).join("");
+        host.querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", () => { STORE.reviewDeptItem(deptId, b.dataset.ok, true); alert("已发布"); renderMyTab(); renderPublished(); }));
+        host.querySelectorAll("[data-no]").forEach((b) => b.addEventListener("click", () => { STORE.reviewDeptItem(deptId, b.dataset.no, false); alert("已驳回"); renderMyTab(); }));
+        host.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认删除？")) return; STORE.deleteDeptItem(deptId, b.dataset.del); renderMyTab(); renderPublished(); }));
+      }
+
+      // 举报箱（纪检成员）
+      function renderReports() {
+        const host = document.getElementById("mt-reports");
+        const list = STORE.myReports();
+        if (!list.length) { host.innerHTML = '<p class="muted-note">暂无匿名举报。</p>'; return; }
+        host.innerHTML = list.map((r, i) => {
+          const stLabel = r.status === "open" ? "待受理" : r.status === "closed" ? "已归档" : "处理中";
+          return '<div class="redeem-item"><div class="ri-body"><b>举报 #' + (i + 1) + '</b>' +
+            (r.target ? '<div class="ri-cost">涉案：' + esc(r.target) + '</div>' : "") +
+            (r.detail ? '<div class="ri-cost">经过：' + esc(r.detail) + '</div>' : "") +
+            (r.evidence && r.evidence.length ? '<div class="ri-cost">佐证：' + r.evidence.length + ' 张</div>' : "") +
+            (r.other ? '<div class="ri-cost">备注：' + esc(r.other) + '</div>' : "") +
+            '</div><span class="chip-status ' + r.status + '">' + stLabel + '</span>' +
+            '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" data-mark="' + r.id + '">切换状态</button></div>';
+        }).join("");
+        host.querySelectorAll("[data-mark]").forEach((b) => b.addEventListener("click", () => {
+          const cur = STORE.myReports().find((x) => x.id === b.dataset.mark);
+          STORE.markReport(b.dataset.mark, cur && cur.status === "open" ? "closed" : "open");
+          renderReports();
+        }));
+      }
+
+      switchTab("add");
+    }
+
+    renderPublished();
+  })();
+  </script>
+</body>
+</html>
