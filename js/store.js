@@ -634,7 +634,7 @@ const STORE = (function () {
     if (extra) Object.assign(u, extra);
     return u;
   }
-  // 注册（家长/访客）
+  // 注册（家长/访客）。远程模式同步到服务端，避免刷新/换设备丢失；服务端不可达才回退本地。
   async function register(payload) {
     const role = payload.role === "parent" ? "parent" : "guest";
     const name = String(payload.name || "").trim();
@@ -647,14 +647,35 @@ const STORE = (function () {
 
     const pwdHash = await hashPassword(password); // 只存哈希，不存明文
     const users = getUsers();
+    let extra = {};
     if (role === "parent") {
       const sid = payload.studentId;
       const child = users.find((x) => x.id === sid);
       if (!child) return { ok: false, msg: "请选择要关联的学生" };
-      users.push(mkMember("parent", name, account, pwdHash, { studentId: child.id, studentName: child.name, contact: { qq: "", email: "", phone: account } }));
-    } else {
-      users.push(mkMember("guest", name, account, pwdHash));
+      extra = Object.assign(extra, {
+        studentId: child.id, studentName: child.name,
+        contact: { qq: "", email: "", phone: account },
+      });
     }
+    if (isRemote()) {
+      const body = {
+        role, name, account, password: pwdHash,
+        studentId: extra.studentId || "", studentName: extra.studentName || "",
+        contact: extra.contact || {},
+      };
+      try {
+        const resp = await fetch(apiBase + "/docs/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const d = await resp.json();
+        if (d && d.ok) { extra.id = d.id; } // 使用服务端生成的 id，保证多设备一致
+        else if (d && d.msg) return { ok: false, msg: d.msg }; // 账号重复等硬错误直接返回
+        // 其它（网络/未知）静默回退为本地登记，下次同步兜底
+      } catch (e) { /* 网络异常：回退本地 */ }
+    }
+    users.push(mkMember(role, name, account, pwdHash, extra));
     saveUsers(users);
     return { ok: true, msg: "注册申请已提交，请等待班主任审核" };
   }

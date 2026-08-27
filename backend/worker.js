@@ -144,6 +144,7 @@ export default {
       // 公开接口
       if (path === "/login" && method === "POST") result = await doLogin(request, env);
       else if (path === "/docs/login" && method === "POST") result = await docsLogin(request, env);
+      else if (path === "/docs/register" && method === "POST") result = await docsRegister(request, env);
       else if (path === "/leaderboard" && method === "GET") result = leaderboard(env);
       else if (path === "/docs" && method === "GET") result = await getDocs(request, env);
       else if (path === "/docs/bootstrap" && method === "POST") result = await docsBootstrap(request, env);
@@ -220,6 +221,43 @@ async function docsLogin(request, env) {
   return { ok: true, token: await signToken(u.id), user: { id: u.id, name: u.name, role: u.role, mustChange: !!u.mustChange } };
 }
 
+// 公开注册：家长 / 访客申请账号（进入待审核）。
+// 未登录也可调用，仅允许追加 status=pending 的 parent/guest 到 users 文档，绝不改他人数据。
+async function docsRegister(request, env) {
+  const body = await request.json();
+  const role = body.role === "parent" ? "parent" : "guest";
+  const name = String(body.name || "").trim();
+  const account = String(body.account || "").trim();
+  const password = String(body.password || "");
+  if (!name || !account) return { ok: false, msg: "请填写姓名和登录账号" };
+  // 只接受哈希（加盐或旧 SHA-256），绝不以明文入库
+  if (!IS_HASH_RE.test(password) && !SALTED_RE.test(password)) return { ok: false, msg: "密码格式错误，请刷新重试" };
+
+  const row = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
+  let users = [];
+  if (row) { try { users = JSON.parse(row.value); } catch (e) { return { ok: false, msg: "用户数据损坏" }; } }
+  if (users.find((u) => u.account === account)) return { ok: false, msg: "该账号已被使用，请更换" };
+  if (role === "parent") {
+    if (!body.studentId || !body.studentName) return { ok: false, msg: "请选择要关联的学生" };
+    if (!users.find((u) => u.id === body.studentId)) return { ok: false, msg: "关联的学生不存在" };
+  }
+  const contact = body.contact && typeof body.contact === "object" ? body.contact : { qq: "", email: "", phone: "" };
+  const newU = {
+    id: uid(role === "parent" ? "par" : "gst"),
+    name, account, password, role, status: "pending",
+    studentId: body.studentId || "", studentName: body.studentName || "",
+    registerTs: new Date().toISOString(), score: 0,
+    nickname: "", nickPending: "", avatar: "",
+    department: "", departmentRole: "",
+    contact, bio: "", personalImages: [], badges: [], groupId: "", mustChange: false,
+  };
+  users.push(newU);
+  await env.DB.prepare(
+    "INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('users', ?, datetime('now'))"
+  ).bind(JSON.stringify(users)).run();
+  return { ok: true, id: newU.id };
+}
+
 async function doLogin(request, env) {
   const { account, password } = await request.json();
   if (!account || !password) return { ok: false, msg: "请填写账号和密码" };
@@ -260,7 +298,8 @@ async function updateMe(request, env, auth) {
     );
   }
   // 仅允许用户更新自己的密码（哈希）与首次改密标记；绝不允许改 role/score 等
-  if (body.password !== undefined && /^[0-9a-f]{64}$/i.test(body.password)) allowed.password = body.password;
+  // 密码哈希既可能是旧无盐 SHA-256(64hex)，也可能是新加盐 `盐.摘要`(32hex.64hex)
+  if (body.password !== undefined && (/^[0-9a-f]{64}$/i.test(body.password) || SALTED_RE.test(body.password))) allowed.password = body.password;
   if (body.mustChange !== undefined) allowed.mustChange = !!body.mustChange;
 
   const row = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
