@@ -23,10 +23,67 @@ function uid(prefix) {
   return prefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
 }
 
+// ---- 令牌签名 ----
+// 安全令牌 = "<id>.<签名字符串>"，用 Worker 密钥 AUTH_SECRET 做 HMAC-SHA256 签名。
+// 未设置 AUTH_SECRET 时退化为旧的 base64(id)（仅限过渡期，强烈建议在 Cloudflare 配置密钥后即完成升级）。
+const IS_HASH_RE = /^[0-9a-f]{64}$/i;
+let _authSecret = ""; // 由 fetch 入口根据 env 设置
+
+function setAuthSecret(env) {
+  _authSecret = (env && env.AUTH_SECRET) ? String(env.AUTH_SECRET) : "";
+}
+
+function legacyToken(id) {
+  try { return btoa(id); } catch (e) { return id; }
+}
+
+async function hmacHex(data, secret) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function signToken(id) {
+  if (!_authSecret) return legacyToken(id);
+  const sig = await hmacHex(id, _authSecret);
+  return id + "." + sig;
+}
+
+async function verifyToken(token) {
+  if (!token) return null;
+  let id = null;
+  if (_authSecret) {
+    const dot = token.lastIndexOf(".");
+    if (dot <= 0) return null;
+    const cand = token.slice(0, dot);
+    const sig = token.slice(dot + 1);
+    if (!cand || !sig) return null;
+    if (sig.toLowerCase() !== (await hmacHex(cand, _authSecret))) return null; // 签名不符，拒绝
+    id = cand;
+  } else {
+    try { id = atob(token); } catch (e) { return null; }
+  }
+  return id || null;
+}
+
+// 校验密码：兼容已哈希 / 旧明文，一律返回新哈希（并存库升级）
+async function checkPassword(plain, stored) {
+  const ok = IS_HASH_RE.test(stored)
+    ? (await hashPassword(plain)).toLowerCase() === stored.toLowerCase()
+    : plain === stored;
+  return ok ? await hashPassword(plain) : null;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^\/api/, "");
+    setAuthSecret(env); // 每次请求按当前 env 刷新密钥，便于瞬时切换状态
     const method = request.method;
 
     // 简化 CORS
@@ -43,6 +100,7 @@ export default {
 
       // 公开接口
       if (path === "/login" && method === "POST") result = await doLogin(request, env);
+      else if (path === "/docs/login" && method === "POST") result = await docsLogin(request, env);
       else if (path === "/leaderboard" && method === "GET") result = leaderboard(env);
       else if (path === "/docs" && method === "GET") result = await getDocs(request, env);
       else if (path === "/docs/bootstrap" && method === "POST") result = await docsBootstrap(request, env);
@@ -75,21 +133,45 @@ export default {
   },
 };
 
-// ---- 认证：Authorization: Bearer <token>，token = base64(id) ----
+// ---- 认证：Authorization: Bearer <token>，token = 签名令牌（id.HMAC-SHA256(id)）----
 // 用户身份以 docs 表的 users 文档为唯一数据源（与前端一致），
 // 因此后端登录校验也直接查 docs，避免维护两份用户表。
 async function authenticate(request, env) {
   const h = request.headers.get("Authorization") || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
   if (!token) return null;
-  let id;
-  try { id = atob(token); } catch (e) { return null; }
+  const id = await verifyToken(token);
+  if (!id) return null;
   const row = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
   if (!row) return null;
   let users;
   try { users = JSON.parse(row.value); } catch (e) { return null; }
   const u = users.find((x) => x.id === id);
   return u ? { id: u.id, name: u.name, role: u.role } : null;
+}
+
+// 以前端 docs 用户文档为唯一数据源的登录，签发不可伪造的签名令牌。
+async function docsLogin(request, env) {
+  const { account, password } = await request.json();
+  if (!account || !password) return { ok: false, msg: "请填写账号和密码" };
+  const row = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
+  if (!row) return { ok: false, msg: "数据未初始化" };
+  let users;
+  try { users = JSON.parse(row.value); } catch (e) { return { ok: false, msg: "用户数据损坏" }; }
+  const u = users.find((x) => x.account === account);
+  if (!u) return { ok: false, msg: "账号不存在" };
+  const newHash = await checkPassword(password, u.password);
+  if (!newHash) return { ok: false, msg: "密码错误" };
+  if (u.status === "pending") return { ok: false, msg: "该账号待班主任审核，通过后方可登录" };
+  if (u.status === "rejected") return { ok: false, msg: "该注册申请未通过审核" };
+  // 旧明文升级为哈希（个人密码经由登录验证，由服务端写回）
+  if (!IS_HASH_RE.test(u.password)) {
+    u.password = newHash;
+    await env.DB.prepare(
+      "INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('users', ?, datetime('now'))"
+    ).bind(JSON.stringify(users)).run();
+  }
+  return { ok: true, token: await signToken(u.id), user: { id: u.id, name: u.name, role: u.role, mustChange: !!u.mustChange } };
 }
 
 async function doLogin(request, env) {

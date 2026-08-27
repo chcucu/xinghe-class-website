@@ -96,6 +96,21 @@ const STORE = (function () {
   function apiToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
   function setApiToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
 
+  // 向服务端换取不可伪造的签名令牌（id.HMAC-SHA256(id)，密钥在 Worker 侧）。
+  // 成功即存；离线或未配置密钥时回退为旧 base64(id)，保证可用但不承诺防伪。
+  async function fetchSignedToken(account, password) {
+    try {
+      const r = await fetch(apiBase + "/docs/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account: account, password: password }),
+      });
+      const d = await r.json();
+      if (d && d.ok && d.token) return d.token;
+    } catch (e) { /* 网络失败走回退 */ }
+    return null;
+  }
+
   // 把本地数据推送到服务端；未登录或非写权限会静默跳过（下次同步再补）。
   // 仅推送“本会话内实际修改过”的数据键（dirty），避免登录时把陈旧的本地快照
   // 覆盖掉其他同学在服务端的最新数据。
@@ -537,9 +552,11 @@ const STORE = (function () {
       nickname: u.nickname, avatar: u.avatar, mustChange: u.mustChange,
     };
     lsSet(KEY.session, session);
-    // 远程模式：把登录态同步给后端，token 为 base64(id)（与后端 authenticate 一致）
+    // 远程模式：向服务端换取签名令牌；换取失败回退 base64(id)
     if (isRemote()) {
-      try { setApiToken(btoa(u.id)); } catch (e) {}
+      let token = await fetchSignedToken(u.account, password);
+      if (!token) { try { token = btoa(u.id); } catch (e) { token = ""; } }
+      setApiToken(token);
       if (upgraded) pushMe({ password: u.password, mustChange: u.mustChange }); // 明文升级后的哈希推到服务端
       pushDocs(); // 把本会话内修改过的数据推送到服务端
       resyncDocs();
