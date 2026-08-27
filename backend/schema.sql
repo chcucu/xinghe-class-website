@@ -50,5 +50,12 @@ CREATE TABLE IF NOT EXISTS meta (
   value TEXT
 );
 
+-- 通用文档仓库：每个功能一份完整 JSON 文档（相册/新闻/成长档案/部门/悄悄话等）
+CREATE TABLE IF NOT EXISTS docs (
+  key      TEXT PRIMARY KEY,
+  value    TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_ledger_uid ON ledger(uid);
 CREATE INDEX IF NOT EXISTS idx_redeems_status ON redeems(status);

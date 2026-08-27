@@ -7,8 +7,13 @@
 
 const STORE = (function () {
   // —— 部署配置 ——
-  // 本地开发：null（用 localStorage）。上线：填 "https://xxx.workers.dev/api"
+  // 本地开发：null（用 localStorage）。
+  // 上线：填后端 Worker 地址，如 "https://xinghe-bank.你的子域.workers.dev/api"
   const apiBase = null;
+
+  // 后端模式下的会话 / 同步标记
+  const TOKEN_KEY = "xh_api_token";
+  const SYNC_KEY = "xh_sync_ready";
 
   const KEY = {
     users: "xh_users",
@@ -69,11 +74,89 @@ const STORE = (function () {
   }
 
   /* ---------- 本地后端模拟（Cloudflare 部署后替换为 fetch） ---------- */
+  // 本地写入底层：仅写 localStorage，不做任何同步（供同步引擎内部使用）
+  function lsWrite(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  // 数据写入入口：远程模式下写数据键后自动推送到服务端
+  function lsSet(k, v) {
+    lsWrite(k, v);
+    if (isRemote() && k !== KEY.session && k !== KEY.seedVer) pushDocs();
+  }
   function lsGet(k, def) {
     try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; }
     catch (e) { return def; }
   }
-  function lsSet(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+  /* ---------- 远程模式（Cloudflare Worker + D1） ---------- */
+  // 写路径(seed.xxx)：带 STORE.xxx = y 的写函数（如 users, news, gallery…）
+  // 写入后需 resyncDocs() 把所有可写文档从服务端拉回本地，保持多人同步。
+  function isRemote() { return !!apiBase; }
+  function apiToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
+  function setApiToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+
+  // 把本地数据推送到服务端；未登录或非写权限会静默跳过（下次同步再补）。
+  async function pushDocs() {
+    if (!isRemote()) return;
+    const token = apiToken();
+    if (!token) return;
+    const docs = {};
+    const perms = {};
+    Object.keys(KEY).forEach((k) => {
+      if (k === "seedVer" || k === "session") return;
+      const v = lsGet(KEY[k], null);
+      if (v === null) return;
+      if (k === "users") {
+        // 用户表含积分/角色：仅计分权限角色（教师/班委/管理）可覆盖，防普通同学篡改全班数据
+        const s = getSession();
+        const canScore = s && ["teacher", "admin", "monitor", "superadmin"].indexOf(s.role) >= 0;
+        docs[k] = v;
+        perms[k] = canScore ? "any" : "super";
+      } else { docs[k] = v; perms[k] = "any"; }
+    });
+    try {
+      await fetch(apiBase + "/docs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ docs, perms }),
+      });
+    } catch (e) { /* 网络失败时静默，下次再试 */ }
+  }
+
+  // 把服务端可写文档全部拉回本地，并做同步后的标记与刷新。
+  let syncing = null;
+  async function resyncDocs() {
+    if (!isRemote()) return;
+    if (syncing) return syncing;
+    syncing = (async () => {
+      try {
+        const token = apiToken();
+        const resp = await fetch(apiBase + "/docs?keys=" + encodeURIComponent(
+          Object.keys(KEY).filter((k) => k !== "seedVer" && k !== "session").join(",")
+        ), { headers: token ? { Authorization: "Bearer " + token } : {} });
+        const data = await resp.json();
+        if (data && data.ok && data.docs) {
+          Object.keys(data.docs).forEach((k) => {
+            const v = data.docs[k];
+            if (v === null || typeof v === "undefined") return;
+            // 登录页在无 token 时也需要用户表来完成客户端校验，故始终拉取
+            lsWrite(KEY[k] || k, v); // 用底层写入，避免触发 pushDocs 造成循环推送
+          });
+        }
+        try { localStorage.setItem(SYNC_KEY, String(Date.now())); } catch (e) {}
+      } catch (e) { /* 服务端不可用时保持本地 */ }
+      finally { syncing = null; }
+    })();
+    return syncing;
+  }
+  function lastSyncedAt() { try { return Number(localStorage.getItem(SYNC_KEY) || 0); } catch (e) { return 0; } }
+  function syncReady() { return lastSyncedAt() > 0; }
+  async function waitSync(ms) {
+    if (!isRemote()) return;
+    const t0 = Date.now();
+    while (Date.now() - t0 < (ms || 2500)) {
+      if (syncReady()) return;
+      await new Promise((r) => setTimeout(r, 60));
+    }
+  }
 
   /* ---------- 工具 ---------- */
   function now() { return new Date().toISOString(); }
@@ -93,6 +176,12 @@ const STORE = (function () {
 
   /* ---------- 初始化种子 ---------- */
   async function ensureSeeded() {
+    // 远程模式（部署后端）：本地不再自我初始化，只等待服务端同步
+    if (isRemote()) {
+      await remoteBootstrap();
+      await resyncDocs();
+      return;
+    }
     // 版本迁移：种子结构变化时，清除旧数据重新初始化
     if (Number(lsGet(KEY.seedVer, 0)) !== SEED_VERSION) {
       [
@@ -220,6 +309,108 @@ const STORE = (function () {
     lsSet(KEY.meta, { lastUpdate: now(), lastOperator: "系统初始化" });
   }
 
+  /* ---------- 远程首启：把本地种子一次性导入 D1（只成功一次） ---------- */
+  // 部署后首个访问者（任意人）触发；若已被导入过则跳过，改为拉取服务端数据。
+  async function remoteBootstrap() {
+    const marker = lsGet(KEY.seedVer, 0);
+    if (marker) return; // 本地已初始化过（或已同步过），不重复导入
+    try {
+      // 复用本地种子逻辑生成一遍种子文档（与 ensureSeeded 本地分支一致）
+      const seed = await buildSeedDocs();
+      const resp = await fetch(apiBase + "/docs/bootstrap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seed: "xinghe-2026-seed", docs: seed }),
+      });
+      const data = await resp.json();
+      if (data && data.ok) {
+        Object.keys(seed).forEach((k) => lsSet(KEY[k], seed[k]));
+      }
+      // 无论导入成功(首启)还是 409(已存在)，都写标记，避免重复尝试
+      lsSet(KEY.seedVer, String(SEED_VERSION));
+    } catch (e) { /* 网络失败则保持本地，下次再试 */ }
+  }
+
+  // 生成一份与本地种子一致的文档集合（users 直接读 data/*.json 数据文件）。
+  async function buildSeedDocs() {
+    const [students, teachers] = await Promise.all([
+      fetch("data/students.json").then((r) => r.json()),
+      fetch("data/teachers.json").then((r) => r.json()),
+    ]);
+    const users = [];
+    students.forEach((s, i) => {
+      users.push({
+        id: "stu-" + i, name: s.name, account: s.account, password: DEFAULT_PWD,
+        role: s.superadmin ? "superadmin" : "student", score: s.score,
+        nickname: "", nickPending: "", avatar: "", department: "", departmentRole: "",
+        contact: { qq: "", email: "", phone: "" }, bio: "", personalImages: [], badges: [],
+        groupId: "", mustChange: true,
+      });
+    });
+    teachers.forEach((t, i) => {
+      users.push({
+        id: "tea-" + i, name: t.name, account: t.account, password: DEFAULT_PWD,
+        role: t.head ? "admin" : "teacher", subject: t.subject, score: 0,
+        nickname: "", nickPending: "", avatar: "", department: "", departmentRole: "",
+        contact: { qq: "", email: "", phone: "" }, bio: "", personalImages: [], badges: [],
+        groupId: "", mustChange: true,
+      });
+    });
+    const photos = [];
+    for (let i = 1; i <= 107; i++) {
+      const n = String(i).padStart(2, "0");
+      photos.push({ src: "image/class/" + n + ".jpg", caption: "班级掠影", status: "published" });
+    }
+    // 小组：与本地种子一致
+    const groupData = [
+      { leader: "柴丽欣",   members: ["何汶锦", "刘慕辰", "陈劲豪", "周廷翰", "赵晨雅", "汤程杰"] },
+      { leader: "李张涵",   members: ["李雨婷", "郑翀", "张芝清", "谢沂萱", "李文芳"] },
+      { leader: "李欣桐",   members: ["孙明远", "吴优", "梁书宁", "韦尚轩", "马睿瞳", "吴亦翾"] },
+      { leader: "李俊娴",   members: ["吴明慧", "洪晨竣", "付楚珵", "邹奕宁", "郑雨嘉"] },
+      { leader: "杨骐羽",   members: ["王翼航", "杨萌", "杨雯瑶", "赵翌旭", "杨馨", "杨天泽"] },
+      { leader: "康寇佳琦", members: ["王煜滢", "单立安", "陈天和", "李静苒", "焦柔溪", "宋晟睿"] },
+      { leader: "闫熙曼",   members: ["徐开萍", "许文昊", "云健凌", "何兆轩", "徐立凡", "关茗心"] },
+    ];
+    const groups = groupData.map((g, i) => {
+      const id = "grp-" + (i + 1);
+      const lead = users.find((u) => u.name === g.leader);
+      if (lead) { lead.groupId = id; }
+      const members = g.members
+        .map((mn) => { const u = users.find((x) => x.name === mn); if (u) { u.groupId = id; } return u ? { id: u.id, name: u.name } : null; })
+        .filter(Boolean);
+      return {
+        id, name: "第" + (i + 1) + "组",
+        leaderId: lead ? lead.id : null, leaderName: g.leader,
+        members, note: "组长：" + g.leader,
+      };
+    });
+    return {
+      users,
+      groups,
+      ledger: [],
+      redeems: [],
+      news: [],
+      media: [],
+      reports: [],
+      cases: [],
+      articles: [],
+      meds: [],
+      notices: [],
+      duty: [],
+      wall: [],
+      votes: [],
+      stars: [],
+      wishes: [],
+      signups: [],
+      licenses: [],
+      products: [],
+      treasury: [],
+      orders: [],
+      albums: [{ id: uid("alb"), name: "班级风采掠影", author: "系统", createdTs: now(), photos, status: "published" }],
+      meta: { lastUpdate: now(), lastOperator: "系统初始化" },
+    };
+  }
+
   /* ---------- 数据读取 ---------- */
   function getUsers() { return lsGet(KEY.users, []); }
   function getLedger() { return lsGet(KEY.ledger, []); }
@@ -251,9 +442,18 @@ const STORE = (function () {
       nickname: u.nickname, avatar: u.avatar, mustChange: u.mustChange,
     };
     lsSet(KEY.session, session);
+    // 远程模式：把登录态同步给后端，token 为 base64(id)（与后端 authenticate 一致）
+    if (isRemote()) {
+      try { setApiToken(btoa(u.id)); } catch (e) {}
+      pushDocs(); // 把本地种子/数据推送到服务端
+      resyncDocs();
+    }
     return { ok: true, user: session };
   }
-  function logout() { localStorage.removeItem(KEY.session); }
+  function logout() {
+    localStorage.removeItem(KEY.session);
+    setApiToken("");
+  }
 
   function refreshSession() {
     const s = getSession();
@@ -1513,6 +1713,7 @@ const STORE = (function () {
     saveLedger(ledger);
     lsSet(KEY.products, products);
     setMeta(s.name);
+    pushDocs(); // 远程模式：把本次写操作同步到服务端
     return { ok: true, msg: "购买成功" };
   }
 
@@ -1520,6 +1721,7 @@ const STORE = (function () {
   return {
     apiBase,
     ensureSeeded,
+    isRemote, pushDocs, resyncDocs, syncReady, lastSyncedAt, waitSync,
     login, logout, changePassword, skipPasswordChange, refreshSession,
     register, pendingRegistrations, reviewRegister, myChild,
     getSession, findById, findByAccount,

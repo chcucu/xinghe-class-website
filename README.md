@@ -44,7 +44,21 @@
 
 ## 数据存在哪里
 
-默认存在浏览器的 localStorage 里。要多人共享同一份数据，需要部署 Cloudflare Worker 后端，后端代码在 backend 文件夹里。
+默认存在浏览器的 localStorage 里，每个浏览器各存一份，互不相通。
+
+要让大家共用同一份数据，需要部署 Cloudflare Worker 后端，后端代码在 backend 文件夹里。部署后把所有数据放进 D1 数据库，全班同学和家长就能看到同一份内容了。
+
+部署后端：
+
+1. 装好 Node.js，在 backend 文件夹打开终端。
+2. 创建数据库：`npx wrangler d1 create xinghe-bank`，把返回的 database_id 填到 backend/wrangler.toml 里。
+3. 建表：`npx wrangler d1 execute xinghe-bank --file=./schema.sql`
+4. 导入初始账号：`npx wrangler d1 execute xinghe-bank --file=./seed.sql`（可用 `node import.mjs` 重新生成 seed.sql）
+5. 部署：`npx wrangler deploy`，会得到一个类似 `https://xinghe-bank.你的子域.workers.dev` 的地址。
+6. 打开 js/store.js，把第 12 行的 `apiBase` 改成该地址加 `/api`。
+7. 重新部署前端到 Pages，让同学用新地址访问。
+
+部署完成后，任何人第一次打开网站，会自动把初始数据导入 D1，之后的改动都会同步到服务器。
 
 ## 开源许可
 

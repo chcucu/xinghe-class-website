@@ -44,6 +44,8 @@ export default {
       // 公开接口
       if (path === "/login" && method === "POST") result = await doLogin(request, env);
       else if (path === "/leaderboard" && method === "GET") result = leaderboard(env);
+      else if (path === "/docs" && method === "GET") result = await getDocs(request, env);
+      else if (path === "/docs/bootstrap" && method === "POST") result = await docsBootstrap(request, env);
       // 需登录
       else if (!auth) return json({ ok: false, msg: "未登录或登录已过期" }, 401);
       else {
@@ -58,6 +60,8 @@ export default {
           case path === "/my/ledger" && method === "GET": result = myLedger(env, auth); break;
           case path === "/my/redeems" && method === "GET": result = myRedeems(env, auth); break;
           case path === "/meta" && method === "GET": result = await getMeta(env); break;
+          case path === "/docs" && method === "PUT": result = await putDocs(request, env, auth); break;
+          case path === "/docs/reset" && method === "POST": result = await docsReset(request, env, auth); break;
           default: result = json({ ok: false, msg: "接口不存在" }, 404);
         }
       }
@@ -232,4 +236,87 @@ async function getMeta(env) {
 async function setMeta(env, auth) {
   await env.DB.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('last', ?)")
     .bind(JSON.stringify({ ts: new Date().toISOString(), operator: auth.name })).run();
+}
+
+// ============================================================
+// 通用文档仓库：每个功能一份完整 JSON 文档
+// GET /api/docs?keys=a,b   拉取指定文档（未存则返回 null）
+// PUT /api/docs            整包保存 { key: value }（body 内传 perms 控制覆盖权限）
+// POST /api/docs/bootstrap 首启一次性导入（种子；须带 seed 校验值，只能成功一次）
+// POST /api/docs/reset     清空并重建种子（仅 admin/superadmin）
+// ============================================================
+function safeJson(v, fallback) {
+  try { return JSON.parse(v); } catch (e) { return fallback; }
+}
+
+function isSuper(role) { return role === "admin" || role === "superadmin"; }
+
+async function getDocs(request, env) {
+  const url = new URL(request.url);
+  const keys = (url.searchParams.get("keys") || "").split(",").filter(Boolean);
+  const out = {};
+  if (keys.length) {
+    const rows = await env.DB.prepare(
+      "SELECT key, value FROM docs WHERE key IN (" + keys.map(() => "?").join(",") + ")"
+    ).bind(...keys).all();
+    rows.results.forEach((r) => { out[r.key] = safeJson(r.value, null); });
+  }
+  return { ok: true, docs: out };
+}
+
+async function putDocs(request, env, auth) {
+  // 覆盖权限：body.perms 里 key -> 'any'（登录即可写）| 'super'（仅管理）
+  const body = await request.json();
+  const docs = body.docs || {};
+  const perms = body.perms || {};
+  const names = Object.keys(docs);
+  if (!names.length) return { ok: false, msg: "没有要保存的内容" };
+  const canSuper = isSuper(auth.role);
+  const batch = [];
+  names.forEach((k) => {
+    const p = perms[k] === "super" ? "super" : "any";
+    if (p === "super" && !canSuper) return;
+    batch.push(
+      env.DB.prepare("INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES (?, ?, datetime('now'))")
+        .bind(k, JSON.stringify(docs[k]))
+    );
+  });
+  if (!batch.length) return { ok: false, msg: "没有权限写入这些内容" };
+  await env.DB.batch(batch);
+  return { ok: true, saved: batch.length };
+}
+
+async function docsBootstrap(request, env) {
+  const body = await request.json();
+  if (body.seed !== "xinghe-2026-seed") return json({ ok: false, msg: "校验失败" }, 403);
+  const docs = body.docs || {};
+  const names = Object.keys(docs);
+  if (!names.length) return { ok: false, msg: "没有内容" };
+  // 已存在则拒绝，避免覆盖线上数据
+  const existing = await env.DB.prepare(
+    "SELECT key FROM docs WHERE key IN (" + names.map(() => "?").join(",") + ")"
+  ).bind(...names).first();
+  if (existing) return json({ ok: false, msg: "已初始化过，请勿重复导入" }, 409);
+  const batch = names.map((k) =>
+    env.DB.prepare("INSERT INTO docs (key, value, updated_at) VALUES (?, ?, datetime('now'))")
+      .bind(k, JSON.stringify(docs[k]))
+  );
+  await env.DB.batch(batch);
+  return { ok: true, imported: batch.length };
+}
+
+async function docsReset(request, env, auth) {
+  if (!isSuper(auth.role)) return { ok: false, msg: "无权限" };
+  const body = await request.json();
+  if (body.seed !== "xinghe-2026-seed") return { ok: false, msg: "校验失败" };
+  const docs = body.docs || {};
+  const names = Object.keys(docs);
+  const batch = [
+    env.DB.prepare("DELETE FROM docs"),
+  ].concat(names.map((k) =>
+    env.DB.prepare("INSERT INTO docs (key, value, updated_at) VALUES (?, ?, datetime('now'))")
+      .bind(k, JSON.stringify(docs[k]))
+  ));
+  await env.DB.batch(batch);
+  return { ok: true, reset: names.length };
 }
