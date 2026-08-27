@@ -123,6 +123,8 @@
   <script src="js/guard.js"></script>
   <script src="js/main.js"></script>
   <script src="js/site.js"></script>
+  <script src="js/vendor-image-compression.js"></script>
+  <script src="js/img.js"></script>
   <script>
   (async function () {
     await STORE.ensureSeeded();
@@ -130,29 +132,6 @@
     const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const s = STORE.getSession();
     const canUpload = !!s && s.role !== "guest";
-
-    /* ---- 下载并压缩图片为 dataURL ---- */
-    function fitImage(file, maxSize, quality) {
-      return new Promise((resolve, reject) => {
-        const rd = new FileReader();
-        rd.onload = () => {
-          const img = new Image();
-          img.onload = () => {
-            const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-            const w = Math.round(img.width * scale);
-            const h = Math.round(img.height * scale);
-            const cv = document.createElement("canvas");
-            cv.width = w; cv.height = h;
-            cv.getContext("2d").drawImage(img, 0, 0, w, h);
-            resolve(cv.toDataURL("image/jpeg", quality));
-          };
-          img.onerror = reject;
-          img.src = rd.result;
-        };
-        rd.onerror = reject;
-        rd.readAsDataURL(file);
-      });
-    }
 
     /* ---- 上传者是否为可管理当前照片 ---- */
     const canManage = (p) => STORE.galleryCanManage(p);
@@ -284,7 +263,7 @@
         const hint = document.getElementById("fileHint");
         hint.textContent = "正在压缩上传，请稍候…";
         try {
-          const dataUrl = await fitImage(f, 1280, 0.82);
+          const dataUrl = await IMG.toDataUrl(f);
           const g2 = STORE.galleryGet();
           const ok = (function () { try { const t = { albums: g2.albums, photos: g2.photos.concat([{ id: "_", albumId, name: "_" }]) }; localStorage.setItem("__cap_test", JSON.stringify(t)); const cur = localStorage.getItem("__cap_test"); localStorage.removeItem("__cap_test"); return cur !== null; } catch (e) { return false; } })();
           if (!ok && !confirm("当前相册空间不足，可能无法保存大图，仍要继续吗？")) { hint.textContent = "已取消上传。"; return; }
@@ -294,7 +273,7 @@
           document.getElementById("inpFile").value = "";
           render();
         } catch (e) {
-          hint.textContent = "无法读取该图片文件，请换一张。";
+          hint.textContent = (e && e.message) ? e.message : "无法读取该图片文件，请换一张。";
         }
       });
     } else {

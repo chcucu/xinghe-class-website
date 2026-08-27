@@ -141,6 +141,8 @@
   <script src="js/guard.js"></script>
   <script src="js/main.js"></script>
   <script src="js/site.js"></script>
+  <script src="js/vendor-image-compression.js"></script>
+  <script src="js/img.js"></script>
   <script>
   (async function () {
     await STORE.ensureSeeded();
@@ -237,12 +239,14 @@
           repEvidence = [];
         }
       });
-      document.getElementById("repFile").addEventListener("change", function () {
+      document.getElementById("repFile").addEventListener("change", async function () {
         const f = this.files && this.files[0];
         if (!f) return;
-        const rd = new FileReader();
-        rd.onload = () => { repEvidence.push(rd.result); document.getElementById("repFileHint").textContent = "已添加 " + repEvidence.length + " 张佐证"; };
-        rd.readAsDataURL(f);
+        try {
+          const dataUrl = await IMG.toDataUrl(f);
+          repEvidence.push(dataUrl);
+          document.getElementById("repFileHint").textContent = "已添加 " + repEvidence.length + " 张佐证";
+        } catch (e) { alert((e && e.message) ? e.message : "无法读取该图片，请换一张"); }
         this.value = "";
       });
     }
@@ -281,12 +285,14 @@
         document.querySelectorAll("[data-file]").forEach((inp) => {
           const k = inp.dataset.k;
           const hint = document.querySelector('[data-hint="' + k + '"]');
-          inp.addEventListener("change", function () {
+          inp.addEventListener("change", async function () {
             const f = this.files && this.files[0];
             if (!f) return;
-            const rd = new FileReader();
-            rd.onload = () => { inp._val = rd.result; if (hint) hint.textContent = "已上传"; };
-            rd.readAsDataURL(f);
+            try {
+              const dataUrl = await IMG.toDataUrl(f);
+              inp._val = dataUrl;
+              if (hint) hint.textContent = "已压缩上传";
+            } catch (e) { alert((e && e.message) ? e.message : "无法读取该图片，请换一张"); }
           });
         });
         document.getElementById("btnPublish").addEventListener("click", () => {

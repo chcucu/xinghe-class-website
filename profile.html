@@ -163,6 +163,8 @@
   <script src="js/guard.js"></script>
   <script src="js/main.js"></script>
   <script src="js/site.js"></script>
+  <script src="js/vendor-image-compression.js"></script>
+  <script src="js/img.js"></script>
   <script>
   (async function () {
     await STORE.ensureSeeded();
@@ -255,17 +257,15 @@
     // 头像上传
     const fileInput = document.getElementById("fileInput");
     document.getElementById("btnPick").addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", () => {
+    fileInput.addEventListener("change", async () => {
       const f = fileInput.files && fileInput.files[0];
       if (!f) return;
-      if (f.size > 2 * 1024 * 1024) { alert("图片过大，请选择 2MB 以内的图片"); return; }
-      const rd = new FileReader();
-      rd.onload = () => {
-        const r = STORE.setAvatar(rd.result);
+      try {
+        const dataUrl = await IMG.toDataUrl(f, { maxWidthOrHeight: 640 }); // 头像压缩到约 640px
+        const r = STORE.setAvatar(dataUrl);
         if (r.ok) { alert("头像已更新"); renderAvatar(); }
         else alert(r.msg);
-      };
-      rd.readAsDataURL(f);
+      } catch (e) { alert((e && e.message) ? e.message : "无法读取该图片，请换一张"); }
       fileInput.value = "";
     });
 
@@ -280,26 +280,24 @@
     // 个人图片上传
     const imgInput = document.getElementById("imgInput");
     document.getElementById("btnAddImg").addEventListener("click", () => imgInput.click());
-    imgInput.addEventListener("change", () => {
+    imgInput.addEventListener("change", async () => {
       const f = imgInput.files && imgInput.files[0];
       if (!f) return;
-      if (f.size > 2 * 1024 * 1024) { alert("图片过大，请选择 2MB 以内"); return; }
-      const rd = new FileReader();
-      rd.onload = () => {
-        const r = STORE.addPersonalImage(rd.result);
+      try {
+        const dataUrl = await IMG.toDataUrl(f);
+        const r = STORE.addPersonalImage(dataUrl);
         if (r.ok) { renderImgs(); } else alert(r.msg);
-      };
-      rd.readAsDataURL(f);
+      } catch (e) { alert((e && e.message) ? e.message : "无法读取该图片，请换一张"); }
       imgInput.value = "";
     });
 
     // 改密
-    document.getElementById("btnPwd").addEventListener("click", () => {
+    document.getElementById("btnPwd").addEventListener("click", async () => {
       const p1 = document.getElementById("newPwd").value;
       const p2 = document.getElementById("newPwd2").value;
       if (!p1 || p1.length < 4) { alert("密码至少 4 位"); return; }
       if (p1 !== p2) { alert("两次输入的密码不一致"); return; }
-      const r = STORE.changePassword(p1);
+      const r = await STORE.changePassword(p1);
       if (r.ok) { alert("密码已更新"); document.getElementById("newPwd").value = ""; document.getElementById("newPwd2").value = ""; }
       else alert(r.msg);
     });

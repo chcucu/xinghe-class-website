@@ -49,7 +49,7 @@
     const password = document.getElementById("password").value;
     if (!account || !password) { showError("请填写账号和密码"); return; }
 
-    const r = STORE.login(account, password);
+    const r = await STORE.login(account, password);
     if (!r.ok) { showError(r.msg); return; }
 
     if (r.user.mustChange) {
@@ -63,13 +63,13 @@
   });
 
   // 首次改密
-  chpwdForm.addEventListener("submit", (e) => {
+  chpwdForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const npwd = document.getElementById("npwd").value;
     const npwd2 = document.getElementById("npwd2").value;
     if (!npwd || npwd.length < 4) { showError("密码至少 4 位"); return; }
     if (npwd !== npwd2) { showError("两次输入的密码不一致"); return; }
-    const r = STORE.changePassword(npwd);
+    const r = await STORE.changePassword(npwd);
     if (!r.ok) { showError(r.msg); return; }
     goAfterLogin();
   });

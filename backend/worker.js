@@ -51,6 +51,7 @@ export default {
       else {
         switch (true) {
           case path === "/me" && method === "GET": result = me(auth); break;
+          case path === "/me/update" && method === "POST": result = await updateMe(request, env, auth); break;
           case path === "/change-password" && method === "POST": result = await changePassword(request, env, auth); break;
           case path === "/delta" && method === "POST": result = await applyDelta(request, env, auth); break;
           case path === "/undo" && method === "POST": result = await undoLast(env, auth); break;
@@ -114,6 +115,36 @@ async function changePassword(request, env, auth) {
   if (!password || password.length < 4) return { ok: false, msg: "密码至少 4 位" };
   const hash = await hashPassword(password);
   await env.DB.prepare("UPDATE users SET password_hash = ?, must_change = 0 WHERE id = ?").bind(hash, auth.id).run();
+  return { ok: true };
+}
+
+// 用户仅可更新自己的个人字段（头像/昵称申请/简介/简介图/联系方式）。
+// 不整表覆盖 users（普通同学无法写全表），却能确保个人数据持久化、不会丢失。
+async function updateMe(request, env, auth) {
+  const body = await request.json();
+  const allowed = {};
+  if (body.avatar !== undefined) allowed.avatar = String(body.avatar);
+  if (body.nickPending !== undefined) allowed.nickPending = String(body.nickPending).slice(0, 12);
+  if (body.bio !== undefined) allowed.bio = String(body.bio).slice(0, 120);
+  if (body.contact !== undefined) allowed.contact = body.contact && typeof body.contact === "object" ? body.contact : {};
+  if (Array.isArray(body.personalImages)) {
+    allowed.personalImages = body.personalImages.slice(0, 12).map((it) =>
+      typeof it === "string" ? { src: it, ts: new Date().toISOString() } : it
+    );
+  }
+  // 仅允许用户更新自己的密码（哈希）与首次改密标记；绝不允许改 role/score 等
+  if (body.password !== undefined && /^[0-9a-f]{64}$/i.test(body.password)) allowed.password = body.password;
+  if (body.mustChange !== undefined) allowed.mustChange = !!body.mustChange;
+
+  const row = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
+  let users = [];
+  if (row) { try { users = JSON.parse(row.value); } catch (e) { return json({ ok: false, msg: "用户数据损坏" }, 500); } }
+  const idx = users.findIndex((u) => u.id === auth.id);
+  if (idx < 0) return { ok: false, msg: "用户不存在" };
+  users[idx] = Object.assign({}, users[idx], allowed);
+  await env.DB.prepare(
+    "INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('users', ?, datetime('now'))"
+  ).bind(JSON.stringify(users)).run();
   return { ok: true };
 }
 

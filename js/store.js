@@ -79,7 +79,10 @@ const STORE = (function () {
   // 数据写入入口：远程模式下写数据键后自动推送到服务端
   function lsSet(k, v) {
     lsWrite(k, v);
-    if (isRemote() && k !== KEY.session && k !== KEY.seedVer) pushDocs();
+    if (isRemote() && k !== KEY.session && k !== KEY.seedVer) {
+      dirtyKeys.add(k);
+      pushDocs();
+    }
   }
   function lsGet(k, def) {
     try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; }
@@ -94,13 +97,18 @@ const STORE = (function () {
   function setApiToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
 
   // 把本地数据推送到服务端；未登录或非写权限会静默跳过（下次同步再补）。
+  // 仅推送“本会话内实际修改过”的数据键（dirty），避免登录时把陈旧的本地快照
+  // 覆盖掉其他同学在服务端的最新数据。
+  const dirtyKeys = new Set();
   async function pushDocs() {
     if (!isRemote()) return;
     const token = apiToken();
     if (!token) return;
+    if (!dirtyKeys.size) return;
+    const keys = [...dirtyKeys];
     const docs = {};
     const perms = {};
-    Object.keys(KEY).forEach((k) => {
+    keys.forEach((k) => {
       if (k === "seedVer" || k === "session") return;
       const v = lsGet(KEY[k], null);
       if (v === null) return;
@@ -112,13 +120,15 @@ const STORE = (function () {
         perms[k] = canScore ? "any" : "super";
       } else { docs[k] = v; perms[k] = "any"; }
     });
+    if (!Object.keys(docs).length) return;
     try {
       await fetch(apiBase + "/docs", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({ docs, perms }),
       });
-    } catch (e) { /* 网络失败时静默，下次再试 */ }
+      keys.forEach((k) => dirtyKeys.delete(k));
+    } catch (e) { /* 网络失败时静默保留 dirty，下次再试 */ }
   }
 
   // 把服务端可写文档全部拉回本地，并做同步后的标记与刷新。
@@ -135,8 +145,11 @@ const STORE = (function () {
         const data = await resp.json();
         if (data && data.ok && data.docs) {
           Object.keys(data.docs).forEach((k) => {
-            const v = data.docs[k];
+            let v = data.docs[k];
             if (v === null || typeof v === "undefined") return;
+            // 用户表合并：保留当前登录用户本人的本地个人数据（头像/简介/个人图/联系方式/未审昵称申请），
+            // 避免服务端拉取把本地刚改过、尚未同步的内容覆盖掉，确保重登不丢数据。
+            if (k === "users") v = mergeUsersOnSync(v);
             // 登录页在无 token 时也需要用户表来完成客户端校验，故始终拉取
             lsWrite(KEY[k] || k, v); // 用底层写入，避免触发 pushDocs 造成循环推送
           });
@@ -146,6 +159,46 @@ const STORE = (function () {
       finally { syncing = null; }
     })();
     return syncing;
+  }
+
+  // 把当前用户的个人字段单独推送到服务端（头像/昵称申请/简介/个人图/联系方式）。
+  // 普通同学无法整表写 users，走 /me/update 只更新自己的字段，防止重登后个人数据丢失。
+  async function pushMe(patch) {
+    if (!isRemote()) return;
+    const token = apiToken();
+    if (!token) return;
+    try {
+      await fetch(apiBase + "/me/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify(patch),
+      });
+    } catch (e) { /* 网络失败时静默，下次再试 */ }
+  }
+
+  // 服务端用户表合并：仅对“当前登录用户”合并其本人可编辑、且只由本人修改的字段，
+  // 其余用户与字段一律以服务端为准，避免覆盖他人或管理员的数据。
+  function mergeUsersOnSync(serverUsers) {
+    if (!Array.isArray(serverUsers)) return serverUsers;
+    const s = getSession();
+    const localUsers = lsGet(KEY.users, []);
+    if (!s || !Array.isArray(localUsers)) return serverUsers;
+    const li = localUsers.findIndex((u) => u && u.id === s.id);
+    if (li < 0) return serverUsers;
+    const local = localUsers[li] || {};
+    const si = serverUsers.findIndex((u) => u && u.id === s.id);
+    if (si < 0) return serverUsers;
+    const server = serverUsers[si];
+    if (local.avatar) server.avatar = local.avatar;
+    if (local.bio) server.bio = local.bio;
+    if (local.contact && Object.values(local.contact).some(Boolean)) server.contact = local.contact;
+    if (Array.isArray(local.personalImages) && local.personalImages.length) server.personalImages = local.personalImages;
+    if (local.nickPending) server.nickPending = local.nickPending; // 未审昵称申请本地优先
+    if (!server.nickname && local.nickname) server.nickname = local.nickname; // 服务端无昵称时保留本地
+    if (!server.password && local.password) server.password = local.password;
+    if (local.mustChange === true) server.mustChange = true;
+    serverUsers[si] = server;
+    return serverUsers;
   }
   function lastSyncedAt() { try { return Number(localStorage.getItem(SYNC_KEY) || 0); } catch (e) { return 0; } }
   function syncReady() { return lastSyncedAt() > 0; }
@@ -174,6 +227,34 @@ const STORE = (function () {
     return neg ? "-" + a : a;
   }
 
+  /* ---------- 密码哈希（SHA-256，绝不存明文） ---------- */
+  // 与后端 worker.js 的 hashPassword 保持一致（64 位小写 hex），便于前后端互通。
+  async function hashPassword(pw) {
+    const s = String(pw == null ? "" : pw);
+    try {
+      if (typeof crypto !== "undefined" && crypto.subtle) {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+        return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      }
+    } catch (e) { /* 退到同步兜底 */ }
+    // 极旧 / 非安全上下文兜底：保证不漏明文。正常部署(https/localhost)不会走到这里。
+    return syncHashFallback(s);
+  }
+  // 同步兜底哈希（仅在本机无 Web Crypto 时使用，防控明文）
+  function syncHashFallback(s) {
+    let h1 = 0x811c9dc5, h2 = 0x01000193;
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 0x01000193);
+      h2 = Math.imul(h2, 33) ^ c;
+    }
+    return "sync-" + (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
+  }
+  // 判断数据库中密码是否已是哈希（而非旧明文）
+  function isHashed(pw) {
+    return typeof pw === "string" && (/^[0-9a-f]{64}$/i.test(pw) || /^sync-/.test(pw));
+  }
+
   /* ---------- 初始化种子 ---------- */
   async function ensureSeeded() {
     // 远程模式（部署后端）：本地不再自我初始化，只等待服务端同步
@@ -198,13 +279,15 @@ const STORE = (function () {
       fetch("data/students.json").then((r) => r.json()),
       fetch("data/teachers.json").then((r) => r.json()),
     ]);
+    // 统一用哈希存初始密码，绝不落明文
+    const defHash = await hashPassword(DEFAULT_PWD);
     const users = [];
     students.forEach((s, i) => {
       users.push({
         id: "stu-" + i,
         name: s.name,
         account: s.account,
-        password: DEFAULT_PWD,
+        password: defHash,
         role: s.superadmin ? "superadmin" : "student",
         score: s.score,
         nickname: "",
@@ -225,7 +308,7 @@ const STORE = (function () {
         id: "tea-" + i,
         name: t.name,
         account: t.account,
-        password: DEFAULT_PWD,
+        password: defHash,
         role: t.head ? "admin" : "teacher",
         subject: t.subject,
         score: 0,
@@ -337,10 +420,12 @@ const STORE = (function () {
       fetch("data/students.json").then((r) => r.json()),
       fetch("data/teachers.json").then((r) => r.json()),
     ]);
+    // 初始密码统一存为哈希，绝不落明文
+    const defHash = await hashPassword(DEFAULT_PWD);
     const users = [];
     students.forEach((s, i) => {
       users.push({
-        id: "stu-" + i, name: s.name, account: s.account, password: DEFAULT_PWD,
+        id: "stu-" + i, name: s.name, account: s.account, password: defHash,
         role: s.superadmin ? "superadmin" : "student", score: s.score,
         nickname: "", nickPending: "", avatar: "", department: "", departmentRole: "",
         contact: { qq: "", email: "", phone: "" }, bio: "", personalImages: [], badges: [],
@@ -349,7 +434,7 @@ const STORE = (function () {
     });
     teachers.forEach((t, i) => {
       users.push({
-        id: "tea-" + i, name: t.name, account: t.account, password: DEFAULT_PWD,
+        id: "tea-" + i, name: t.name, account: t.account, password: defHash,
         role: t.head ? "admin" : "teacher", subject: t.subject, score: 0,
         nickname: "", nickPending: "", avatar: "", department: "", departmentRole: "",
         contact: { qq: "", email: "", phone: "" }, bio: "", personalImages: [], badges: [],
@@ -431,10 +516,20 @@ const STORE = (function () {
   }
 
   /* ---------- 认证 ---------- */
-  function login(account, password) {
-    const u = findByAccount(account);
+  async function login(account, password) {
+    const users = getUsers();
+    const u = users.find((x) => x.account === account);
     if (!u) return { ok: false, msg: "账号不存在" };
-    if (u.password !== password) return { ok: false, msg: "密码错误" };
+    let upgraded = false;
+    // 已哈希：比对哈希；旧明文：兼容比对，成功后自动升级为哈希存储
+    if (isHashed(u.password)) {
+      if ((await hashPassword(password)) !== u.password) return { ok: false, msg: "密码错误" };
+    } else {
+      if (u.password !== password) return { ok: false, msg: "密码错误" };
+      u.password = await hashPassword(password); // 明文 → 哈希升级
+      saveUsers(users);
+      upgraded = true;
+    }
     if (u.status === "pending") return { ok: false, msg: "该账号待班主任审核，通过后方可登录" };
     if (u.status === "rejected") return { ok: false, msg: "该注册申请未通过审核" };
     const session = {
@@ -445,7 +540,8 @@ const STORE = (function () {
     // 远程模式：把登录态同步给后端，token 为 base64(id)（与后端 authenticate 一致）
     if (isRemote()) {
       try { setApiToken(btoa(u.id)); } catch (e) {}
-      pushDocs(); // 把本地种子/数据推送到服务端
+      if (upgraded) pushMe({ password: u.password, mustChange: u.mustChange }); // 明文升级后的哈希推到服务端
+      pushDocs(); // 把本会话内修改过的数据推送到服务端
       resyncDocs();
     }
     return { ok: true, user: session };
@@ -453,6 +549,7 @@ const STORE = (function () {
   function logout() {
     localStorage.removeItem(KEY.session);
     setApiToken("");
+    dirtyKeys.clear();
   }
 
   function refreshSession() {
@@ -492,7 +589,7 @@ const STORE = (function () {
     return u;
   }
   // 注册（家长/访客）
-  function register(payload) {
+  async function register(payload) {
     const role = payload.role === "parent" ? "parent" : "guest";
     const name = String(payload.name || "").trim();
     const account = String(payload.account || "").trim();
@@ -502,14 +599,15 @@ const STORE = (function () {
     if (password.length < 4) return { ok: false, msg: "密码至少 4 位" };
     if (findByAccount(account)) return { ok: false, msg: "该账号已被使用，请更换" };
 
+    const pwdHash = await hashPassword(password); // 只存哈希，不存明文
     const users = getUsers();
     if (role === "parent") {
       const sid = payload.studentId;
       const child = users.find((x) => x.id === sid);
       if (!child) return { ok: false, msg: "请选择要关联的学生" };
-      users.push(mkMember("parent", name, account, password, { studentId: child.id, studentName: child.name, contact: { qq: "", email: "", phone: account } }));
+      users.push(mkMember("parent", name, account, pwdHash, { studentId: child.id, studentName: child.name, contact: { qq: "", email: "", phone: account } }));
     } else {
-      users.push(mkMember("guest", name, account, password));
+      users.push(mkMember("guest", name, account, pwdHash));
     }
     saveUsers(users);
     return { ok: true, msg: "注册申请已提交，请等待班主任审核" };
@@ -539,15 +637,16 @@ const STORE = (function () {
     return findById(u.studentId);
   }
 
-  function changePassword(newPwd) {
+  async function changePassword(newPwd) {
     const s = getSession();
     if (!s) return { ok: false, msg: "未登录" };
     const users = getUsers();
     const u = users.find((x) => x.id === s.id);
     if (!u) return { ok: false, msg: "用户不存在" };
-    u.password = newPwd;
+    u.password = await hashPassword(newPwd); // 只存哈希
     u.mustChange = false;
     saveUsers(users);
+    pushMe({ password: u.password, mustChange: false });
     s.mustChange = false;
     lsSet(KEY.session, s);
     return { ok: true };
@@ -562,6 +661,7 @@ const STORE = (function () {
     if (!u) return { ok: false, msg: "用户不存在" };
     u.mustChange = false;
     saveUsers(users);
+    pushMe({ mustChange: false });
     s.mustChange = false;
     lsSet(KEY.session, s);
     return { ok: true };
@@ -795,6 +895,7 @@ const STORE = (function () {
     if (!u) return { ok: false, msg: "用户不存在" };
     u.nickPending = nickStr;
     saveUsers(users);
+    pushMe({ nickPending: nickStr });
     return { ok: true };
   }
 
@@ -831,6 +932,7 @@ const STORE = (function () {
     if (!u) return { ok: false, msg: "用户不存在" };
     u.avatar = dataUrl;
     saveUsers(users);
+    pushMe({ avatar: dataUrl });
     refreshSession();
     return { ok: true };
   }
@@ -881,9 +983,12 @@ const STORE = (function () {
     const users = getUsers();
     const u = users.find((x) => x.id === uid);
     if (!u) return { ok: false, msg: "用户不存在" };
-    u.password = DEFAULT_PWD;
-    u.mustChange = true;
-    saveUsers(users);
+    // 重置为默认密码的哈希
+    hashPassword(DEFAULT_PWD).then((h) => {
+      u.password = h;
+      u.mustChange = true;
+      saveUsers(users);
+    });
     logAction("重置密码", u.name + "（重置为初始密码）");
     return { ok: true };
   }
@@ -946,6 +1051,7 @@ const STORE = (function () {
     }
     if (bio !== undefined) u.bio = String(bio || "").slice(0, 120);
     saveUsers(users);
+    pushMe({ contact: u.contact, bio: u.bio });
     refreshSession();
     return { ok: true };
   }
@@ -960,6 +1066,7 @@ const STORE = (function () {
     if (u.personalImages.length >= 12) return { ok: false, msg: "最多上传 12 张" };
     u.personalImages.push({ src: dataUrl, ts: now() });
     saveUsers(users);
+    pushMe({ personalImages: u.personalImages });
     return { ok: true };
   }
   function deletePersonalImage(index) {
@@ -969,6 +1076,7 @@ const STORE = (function () {
     if (!u || !u.personalImages) return { ok: false, msg: "用户不存在" };
     u.personalImages.splice(Number(index), 1);
     saveUsers(users);
+    pushMe({ personalImages: u.personalImages });
     return { ok: true };
   }
 

@@ -81,7 +81,7 @@
       authError.classList.add("show");
     }
 
-    document.getElementById("regForm").addEventListener("submit", (e) => {
+    document.getElementById("regForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       if (tp && !tp.verify()) { showError("请先完成人机验证（按提示顺序点选文字）"); if (tp.refresh) tp.refresh(); return; }
       const name = document.getElementById("name").value.trim();
@@ -94,7 +94,7 @@
       if (password.length < 4) { showError("密码至少 4 位"); return; }
       if (isParent && !studentId) { showError("请选择您关联的孩子"); return; }
 
-      const r = STORE.register({ role, name, account, password, studentId });
+      const r = await STORE.register({ role, name, account, password, studentId });
       if (!r.ok) { showError(r.msg); return; }
       showError("");
       alert(r.msg);
