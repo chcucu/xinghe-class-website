@@ -83,7 +83,7 @@
 
     document.getElementById("regForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (tp && !tp.verify()) { showError("请先完成人机验证（按提示顺序点选文字）"); if (tp.refresh) tp.refresh(); return; }
+      if (tp && !tp.verify()) { showError("请先完成人机验证"); if (tp.refresh) tp.refresh(); return; }
       const name = document.getElementById("name").value.trim();
       const account = document.getElementById("account").value.trim();
       const password = document.getElementById("password").value;
