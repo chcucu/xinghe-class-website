@@ -135,49 +135,6 @@
     </div>
   </section>
 
-  <!-- ============ 最新动态 ============ -->
-  <section class="section alt">
-    <div class="container">
-      <div class="section-head" style="display:flex;align-items:flex-end;justify-content:space-between;max-width:100%;">
-        <div>
-          <span class="eyebrow">News</span>
-          <h2 class="section-title">最新动态</h2>
-        </div>
-        <a href="news.html" class="more-link" style="display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--ink-2);">查看全部
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-      </div>
-      <div class="card-grid news-grid" style="margin-top:34px;">
-        <a href="news-article.html" class="card-news reveal">
-          <div class="thumb"><img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Photo%20of%20middle%20school%20students%20running%20an%20athletic%20relay%20race%20on%20a%20sunny%20school%20track%20field%2C%20energetic%20youthful%20atmosphere%2C%20bright%20natural%20daylight%2C%20realistic%20sports%20photography&image_size=landscape_16_9" alt="校园运动会"></div>
-          <div class="body">
-            <span class="news-date"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M8 2v4M16 2v4M3 9h18"/></svg>2026年5月 · 运动会</span>
-            <h3>校运会 · 星河接力</h3>
-            <p>4×100 接力赛中，我们凭借默契的配合冲进前三，用汗水写下一段难忘的回忆。</p>
-            <span class="more-link">阅读详情 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-          </div>
-        </a>
-        <a href="news-article.html" class="card-news reveal" style="transition-delay:.1s">
-          <div class="thumb"><img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Warm%20book%20reading%20sharing%20session%20in%20a%20bright%20modern%20middle%20school%20classroom%2C%20students%20gathered%20around%20open%20books%2C%20cozy%20literary%20atmosphere%2C%20soft%20window%20light%2C%20clean%20composition&image_size=landscape_16_9" alt="读书分享会"></div>
-          <div class="body">
-            <span class="news-date"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M8 2v4M16 2v4M3 9h18"/></svg>2026年4月 · 读书会</span>
-            <h3>「共读一页星河」读书会</h3>
-            <p>每月一次的共读时光，我们在文字里交换彼此的世界，也交换了对未来的想象。</p>
-            <span class="more-link">阅读详情 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-          </div>
-        </a>
-        <a href="news-article.html" class="card-news reveal" style="transition-delay:.2s">
-          <div class="thumb"><img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Modern%20science%20and%20technology%20festival%20at%20a%20middle%20school%2C%20students%20presenting%20creative%20STEM%20project%20models%2C%20blue%20and%20cyan%20exhibition%20lights%2C%20inquisitive%20youthful%20energy&image_size=landscape_16_9" alt="科技节"></div>
-          <div class="body">
-            <span class="news-date"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M8 2v4M16 2v4M3 9h18"/></svg>2026年3月 · 科技节</span>
-            <h3>智造未来 · 科技节</h3>
-            <p>科创作品展上，我们动手搭建的小模型拿下一等奖，自豪感拉满！</p>
-            <span class="more-link">阅读详情 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-          </div>
-        </a>
-      </div>
-    </div>
-  </section>
-
   <!-- ============ 板块导引 ============ -->
   <section class="section">
     <div class="container">
@@ -187,18 +144,15 @@
         <p class="section-sub">关于我们的一切，欢迎慢慢逛</p>
       </div>
       <div class="quick-links">
-        <a href="class.html" class="quick-link reveal">
-          <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Cheerful%20middle%20school%20students%20standing%20together%20in%20a%20bright%20campus%20courtyard%2C%20looking%20at%20the%20camera%2C%20blue%20sky%2C%20united%20group%20spirit%2C%20realistic%20photo&image_size=landscape_16_9" alt="班级介绍">
+        <a href="class.html" class="quick-link reveal" id="qlIntro">
           <div class="ql-text"><h3>班级介绍</h3><p>理念 · 口号 · 班委 · 任课老师</p></div>
           <span class="ql-arrow">→</span>
         </a>
         <a href="honor.html" class="quick-link reveal" style="transition-delay:.1s">
-          <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Elegant%20gold%20trophy%20and%20medals%20on%20a%20deep%20navy%20blue%20textured%20background%20with%20subtle%20stars%2C%20premium%20minimalist%20composition%2C%20premium%20product%20photography&image_size=landscape_16_9" alt="班级荣誉">
           <div class="ql-text"><h3>班级荣誉</h3><p>奖项 · 光荣榜 · 评价之星</p></div>
           <span class="ql-arrow">→</span>
         </a>
         <a href="members.html" class="quick-link reveal" style="transition-delay:.2s">
-          <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Creative%20student%20artwork%20station%20with%20colorful%20paintings%20and%20crafts%20in%20a%20bright%20art%20classroom%2C%20blue%20and%20warm%20tones%2C%20inspiring%20minimalist%20composition&image_size=landscape_16_9" alt="师生风采">
           <div class="ql-text"><h3>师生风采</h3><p>老师 · 同学 · 优秀作品</p></div>
           <span class="ql-arrow">→</span>
         </a>
@@ -291,6 +245,18 @@
       box.innerHTML = pill(w, "本周" ) + pill(m, "本月" );
     }
     if (window.STORE) setupStars(); else document.addEventListener("DOMContentLoaded", setupStars);
+  })();
+
+  /* 板块导引：班级介绍卡随机引用一张真实班级照片 */
+  (function () {
+    var el = document.getElementById("qlIntro");
+    if (!el) return;
+    var n = Math.floor(Math.random() * 107) + 1;
+    var src = "image/class/" + String(n).padStart(2, "0") + ".jpg";
+    var img = document.createElement("img");
+    img.alt = "班级介绍";
+    img.onload = function () { el.appendChild(img); el.classList.add("has-img"); };
+    img.src = src;
   })();
   </script>
 </body>
