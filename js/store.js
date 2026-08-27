@@ -36,6 +36,7 @@ const STORE = (function () {
     treasury: "xh_treasury",    // 商店：公共池（老师商品积分流入）
     orders: "xh_orders",        // 商店：订单记录
     logs: "xh_logs",            // 管理员操作日志
+    gallery: "xh_gallery",      // 公开相册：成员/家长共同上传
     seedVer: "xh_seed_ver",
   };
 
@@ -99,7 +100,7 @@ const STORE = (function () {
         KEY.reports, KEY.cases, KEY.articles, KEY.meds, KEY.albums, KEY.notices, KEY.duty,
         KEY.wall, KEY.votes, KEY.groups,
         KEY.stars, KEY.wishes, KEY.signups, KEY.licenses, KEY.products,
-        KEY.treasury, KEY.orders,
+        KEY.treasury, KEY.orders, KEY.logs, KEY.gallery,
       ].forEach((k) => localStorage.removeItem(k));
       localStorage.setItem(KEY.seedVer, String(SEED_VERSION));
     }
@@ -930,6 +931,72 @@ const STORE = (function () {
     return out;
   }
 
+  /* ---------- 公开相册（成员 / 家长共同上传） ---------- */
+  function galleryGet() { return lsGet(KEY.gallery, { albums: [], photos: [] }); }
+  function gallerySave(g) { lsSet(KEY.gallery, g); }
+  // 可上传：登录且非访客（本班成员 + 家长）
+  function canUploadGallery() {
+    const s = getSession();
+    if (!s) return false;
+    return s.role !== "guest";
+  }
+  function galleryCreateAlbum(name) {
+    if (!canUploadGallery()) return { ok: false, msg: "请先登录（本班成员或家长可上传）" };
+    name = String(name || "").trim();
+    if (!name) return { ok: false, msg: "请输入相册名称" };
+    const s = getSession();
+    const g = galleryGet();
+    if (g.albums.some((a) => a.name === name)) return { ok: false, msg: "已存在同名相册" };
+    g.albums.unshift({ id: uid("gal"), name, authorId: s.id, authorName: s.nickname || s.name, ts: now() });
+    gallerySave(g);
+    return { ok: true, albumId: g.albums[0].id };
+  }
+  function galleryUpload(albumId, dataUrl, name) {
+    if (!canUploadGallery()) return { ok: false, msg: "请先登录（本班成员或家长可上传）" };
+    const s = getSession();
+    const g = galleryGet();
+    if (!g.albums.some((x) => x.id === albumId)) return { ok: false, msg: "相册不存在" };
+    g.photos.push({ id: uid("gp"), albumId, name: name || "未命名", src: dataUrl, uploaderId: s.id, uploaderName: s.nickname || s.name, ts: now() });
+    gallerySave(g);
+    return { ok: true };
+  }
+  function galleryCanManage(photo) {
+    const s = getSession();
+    if (!s) return false;
+    if (isSuperAdmin(s.role) || s.role === "admin") return true;
+    return !!(photo && photo.uploaderId === s.id);
+  }
+  function galleryRename(photoId, newName) {
+    newName = String(newName || "").trim();
+    if (!newName) return { ok: false, msg: "请输入名称" };
+    const g = galleryGet();
+    const p = g.photos.find((x) => x.id === photoId);
+    if (!p) return { ok: false, msg: "照片不存在" };
+    if (!galleryCanManage(p)) return { ok: false, msg: "仅上传者或管理员可修改" };
+    p.name = newName;
+    gallerySave(g);
+    return { ok: true };
+  }
+  function galleryDeletePhoto(photoId) {
+    const g = galleryGet();
+    const p = g.photos.find((x) => x.id === photoId);
+    if (!p) return { ok: false, msg: "照片不存在" };
+    if (!galleryCanManage(p)) return { ok: false, msg: "仅上传者或管理员可删除" };
+    g.photos = g.photos.filter((x) => x.id !== photoId);
+    gallerySave(g);
+    return { ok: true };
+  }
+  function galleryDeleteAlbum(albumId) {
+    const s = getSession();
+    if (!s) return { ok: false, msg: "请先登录" };
+    if (!(isSuperAdmin(s.role) || s.role === "admin")) return { ok: false, msg: "仅管理员可删除相册" };
+    const g = galleryGet();
+    g.albums = g.albums.filter((a) => a.id !== albumId);
+    g.photos = g.photos.filter((p) => p.albumId !== albumId);
+    gallerySave(g);
+    return { ok: true };
+  }
+
   /* ============================================================
      通知公告：班主任/超管发布，所有人可见
      ============================================================ */
@@ -1470,6 +1537,7 @@ const STORE = (function () {
     getDeptItems, saveDeptItems, addDeptItem, updateDeptItem, reviewDeptItem, deleteDeptItem,
     myReports, submitReport, markReport,
     getAlbums, saveAlbums, addAlbum, addAlbumPhoto, reviewAlbumPhoto, deleteAlbumPhoto, deleteAlbum, allPublishedPhotos,
+    galleryGet, gallerySave, galleryCreateAlbum, galleryUpload, galleryCanManage, galleryRename, galleryDeletePhoto, galleryDeleteAlbum,
     getNotices, addNotice, deleteNotice,
     getDuty, addDutyShift, deleteDutyShift,
     updateProfile, addPersonalImage, deletePersonalImage,

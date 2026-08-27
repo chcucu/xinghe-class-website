@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
-  <meta name="description" content="星河班班级相册 —— 记录每一个精彩瞬间">
+  <meta name="description" content="星河班班级相册 —— 记录每一个精彩瞬间，成员与家长共同上传">
   <title>班级相册 · 星河班</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -22,15 +22,7 @@
         </span>
       </a>
       <nav class="main-nav" id="mainNav">
-        <ul>
-          <li><a href="index.html">首页</a></li>
-          <li><a href="class.html">班级介绍</a></li>
-          <li><a href="news.html">班级新闻</a></li>
-          <li><a href="gallery.html" class="active">班级相册</a></li>
-          <li><a href="honor.html">班级荣誉</a></li>
-          <li><a href="members.html">师生风采</a></li>
-          <li><a href="bank.html">操行银行</a></li>
-        </ul>
+        <ul></ul>
       </nav>
       <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
@@ -41,13 +33,43 @@
       <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>班级相册</span></div>
       <span class="eyebrow">Gallery</span>
       <h1>班级相册</h1>
-      <p class="sub">把每一个转瞬即逝的瞬间，收藏成岁月里闪亮的星。</p>
+      <p class="sub" id="heroSub">把每一个转瞬即逝的瞬间，收藏成岁月里闪亮的星。</p>
     </div>
   </section>
 
-  <section class="section">
+  <section class="section" style="padding-top:30px;">
     <div class="container">
-      <div class="gallery-grid" id="galleryGrid"></div>
+
+      <!-- 隐私说明 + 上传入口（本班成员 / 家长可用） -->
+      <div class="panel" id="uploadPanel" style="display:none;margin-bottom:26px;">
+        <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:220px;">
+            <h3 style="font-size:18px;margin-bottom:8px;">上传说明</h3>
+            <p style="font-size:13px;color:var(--text-soft);line-height:1.7;margin-bottom:4px;">相册仅对登录后的本班同学和家长开放，上传图片会显示你的姓名，方便大家知道是谁分享的。</p>
+            <p style="font-size:13px;color:var(--muted);line-height:1.7;">这是为了守护大家的隐私，也便于有序管理，并非多余步骤。游客与未登录访客无法上传，只能浏览。</p>
+          </div>
+          <div style="min-width:260px;flex:1;">
+            <div class="field" style="margin-bottom:8px;"><label>新建相册</label>
+              <div style="display:flex;gap:8px;"><input id="inpNewAlbum" placeholder="相册名称" style="flex:1;"><button class="btn" id="btnNewAlbum">创建</button></div>
+            </div>
+            <div class="field" style="margin-bottom:4px;"><label>上传图片</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <select id="selAlbum" style="flex:1;min-width:120px;"></select>
+                <input type="file" id="inpFile" accept="image/*" style="max-width:180px;">
+              </div>
+              <span class="hint" style="font-size:12px;color:var(--muted);" id="fileHint">命名可选（留空则用文件名），图片会自动压缩以节省空间。</span>
+              <button class="btn btn-block" id="btnUpload" style="margin-top:8px;max-width:200px;">上传到所选相册</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 相册筛选 -->
+      <div class="filter-chips" id="albumChips"></div>
+
+      <!-- 照片网格 -->
+      <div class="gallery-grid" id="gGrid" style="margin-top:18px;"></div>
+      <p class="muted-note" id="emptyNote" style="display:none;text-align:center;padding:40px 0;">这个相册还没有照片。</p>
     </div>
   </section>
 
@@ -92,23 +114,193 @@
       </div>
       <div class="footer-bottom">
         <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
-        <span>星聚成河 · 逐光而行</span>
+        <span>博学笃行，逐梦星河</span>
       </div>
     </div>
   </footer>
 
-  <script>
-    (function () {
-      const grid = document.getElementById("galleryGrid");
-      const total = 107;
-      let html = "";
-      for (let i = 1; i <= total; i++) {
-        const n = String(i).padStart(2, "0");
-        html += '<div class="gallery-item"><img src="image/class/' + n + '.jpg" alt="班级风采" loading="lazy"></div>';
-      }
-      grid.innerHTML = html;
-    })();
-  </script>
+  <script src="js/store.js"></script>
+  <script src="js/guard.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+
+    const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const s = STORE.getSession();
+    const canUpload = !!s && s.role !== "guest";
+
+    /* ---- 下载并压缩图片为 dataURL ---- */
+    function fitImage(file, maxSize, quality) {
+      return new Promise((resolve, reject) => {
+        const rd = new FileReader();
+        rd.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+            const w = Math.round(img.width * scale);
+            const h = Math.round(img.height * scale);
+            const cv = document.createElement("canvas");
+            cv.width = w; cv.height = h;
+            cv.getContext("2d").drawImage(img, 0, 0, w, h);
+            resolve(cv.toDataURL("image/jpeg", quality));
+          };
+          img.onerror = reject;
+          img.src = rd.result;
+        };
+        rd.onerror = reject;
+        rd.readAsDataURL(file);
+      });
+    }
+
+    /* ---- 上传者是否为可管理当前照片 ---- */
+    const canManage = (p) => STORE.galleryCanManage(p);
+
+    function render() {
+      const g = STORE.galleryGet();
+      const list = g.albums;
+      const photos = g.photos;
+
+      // 相册筛选条
+      const chipsEl = document.getElementById("albumChips");
+      const chipHtml = [
+        '<button class="filter-chip' + (curAlbum === "all" ? " active" : "") + '" data-album="all">全部(' + photos.length + ')</button>'
+      ].concat(list.map((a) => {
+        const c = photos.filter((p) => p.albumId === a.id).length;
+        return '<button class="filter-chip' + (curAlbum === a.id ? " active" : "") + '" data-album="' + a.id + '">' + esc(a.name) + '(' + c + ')</button>';
+      })).join("");
+      chipsEl.innerHTML = chipHtml;
+      chipsEl.querySelectorAll(".filter-chip").forEach((b) => {
+        b.addEventListener("click", () => { curAlbum = b.dataset.album; render(); });
+      });
+
+      // 上传下拉
+      const sel = document.getElementById("selAlbum");
+      if (sel) {
+        const selVal = sel.value || "all";
+        sel.innerHTML = list.map((a) => '<option value="' + a.id + '">' + esc(a.name) + '</option>').join("");
+        if (list.some((a) => a.id === selVal)) sel.value = selVal;
+        else if (list.length) sel.selectedIndex = 0;
+      }
+
+      // 网格
+      const shown = photos.filter((p) => curAlbum === "all" || p.albumId === curAlbum);
+      const grid = document.getElementById("gGrid");
+      document.getElementById("emptyNote").style.display = shown.length ? "none" : "";
+      grid.innerHTML = shown.map((p) => {
+        const a = list.find((al) => al.id === p.albumId);
+        const manage = canManage(p);
+        return '<div class="gallery-item gb-item" data-id="' + p.id + '">' +
+          '<img src="' + p.src + '" alt="' + esc(p.name) + '" loading="lazy">' +
+          '<span class="gb-up">' + esc(p.uploaderName || "班级相册") + '</span>' +
+          '<span class="gb-cap">' + esc(p.name) + '</span>' +
+          (manage ? '<span class="gb-ops"><button class="gb-op" data-rn="' + p.id + '">改名</button><button class="gb-op gb-del" data-del="' + p.id + '">删除</button></span>' : "") +
+          '</div>';
+      }).join("");
+
+      // 改名 / 删除
+      document.querySelectorAll("[data-rn]").forEach((b) => b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const pid = b.dataset.rn;
+        const p = photos.find((x) => x.id === pid);
+        const nn = prompt("修改照片名称", p ? p.name : "");
+        if (nn === null || nn.trim() === "") return;
+        const r = STORE.galleryRename(pid, nn.trim());
+        if (!r.ok) { alert(r.msg); return; }
+        render();
+      }));
+      document.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!confirm("确认删除这张照片？")) return;
+        const r = STORE.galleryDeletePhoto(b.dataset.del);
+        if (!r.ok) { alert(r.msg); return; }
+        render();
+      }));
+
+      // 灯箱打开（点照片卡片）
+      const view = shown.map((p) => ({ src: p.src, name: p.name, up: p.uploaderName }));
+      grid.querySelectorAll(".gb-item").forEach((el, i) => {
+        el.addEventListener("click", () => openLb(view, i));
+      });
+    }
+
+    /* ---- 灯箱 ---- */
+    const lb = document.getElementById("lightbox");
+    const lbImg = lb.querySelector(".lb-img");
+    const lbCap = lb.querySelector(".lb-cap");
+    let view = [], vi = 0;
+    function openLb(arr, i) { view = arr; vi = (i + arr.length) % arr.length; syncLb(); lb.classList.add("open"); }
+    function syncLb() { lbImg.src = view[vi].src; lbImg.alt = view[vi].name; lbCap.textContent = view[vi].name + (view[vi].up ? " · 上传 " + view[vi].up : ""); }
+    lb.querySelector(".lb-close").addEventListener("click", () => lb.classList.remove("open"));
+    lb.querySelector(".lb-prev").addEventListener("click", () => { vi = (vi - 1 + view.length) % view.length; syncLb(); });
+    lb.querySelector(".lb-next").addEventListener("click", () => { vi = (vi + 1) % view.length; syncLb(); });
+    lb.addEventListener("click", (e) => { if (e.target === lb) lb.classList.remove("open"); });
+    document.addEventListener("keydown", (e) => { if (!lb.classList.contains("open")) return; if (e.key === "Escape") lb.classList.remove("open"); if (e.key === "ArrowLeft") { vi = (vi - 1 + view.length) % view.length; syncLb(); } if (e.key === "ArrowRight") { vi = (vi + 1) % view.length; syncLb(); } });
+    // 滑动切换
+    let tx = 0, ty = 0;
+    lb.addEventListener("touchstart", (e) => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+    lb.addEventListener("touchend", (e) => { if (!lb.classList.contains("open")) return; const dx = e.changedTouches[0].clientX - tx; const dy = e.changedTouches[0].clientY - ty; if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.4) return; vi = (vi + (dx < 0 ? 1 : -1) + view.length) % view.length; syncLb(); }, { passive: true });
+
+    let curAlbum = "all";
+
+    /* ---- 首启：若无相册，建「班级风采」并载入默认 107 张 ---- */
+    let seeded = false;
+    function localUid(p) { return p + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8); }
+    function ensureDefault() {
+      if (seeded) return;
+      const g = STORE.galleryGet();
+      if (g.albums.length) return;
+      const albumId = localUid("gal");
+      g.albums.unshift({ id: albumId, name: "班级风采", authorId: "system", authorName: "班级相册", ts: new Date().toISOString() });
+      const rows = [];
+      for (let i = 1; i <= 107; i++) {
+        const n = String(i).padStart(2, "0");
+        rows.push({ id: localUid("gp"), albumId, name: "班级风采 " + n, src: "image/class/" + n + ".jpg", uploaderId: "system", uploaderName: "班级相册", ts: new Date().toISOString() });
+      }
+      g.photos = rows.concat(g.photos);
+      STORE.gallerySave(g);
+    }
+    ensureDefault();
+    render();
+
+    /* ---- 上传/建相册 UI ---- */
+    if (canUpload) {
+      document.getElementById("uploadPanel").style.display = "";
+      document.getElementById("btnNewAlbum").addEventListener("click", () => {
+        const name = document.getElementById("inpNewAlbum").value.trim();
+        if (!name) { alert("请输入相册名称"); return; }
+        const r = STORE.galleryCreateAlbum(name);
+        document.getElementById("inpNewAlbum").value = "";
+        if (!r.ok) { alert(r.msg); return; }
+        curAlbum = r.albumId; render();
+      });
+      document.getElementById("btnUpload").addEventListener("click", async () => {
+        const g = STORE.galleryGet();
+        const albumId = document.getElementById("selAlbum").value;
+        if (!albumId) { alert("请先创建或选择一个相册"); return; }
+        const f = document.getElementById("inpFile").files && document.getElementById("inpFile").files[0];
+        if (!f) { alert("请选择要上传的图片"); return; }
+        const hint = document.getElementById("fileHint");
+        hint.textContent = "正在压缩上传，请稍候…";
+        try {
+          const dataUrl = await fitImage(f, 1280, 0.82);
+          const g2 = STORE.galleryGet();
+          const ok = (function () { try { const t = { albums: g2.albums, photos: g2.photos.concat([{ id: "_", albumId, name: "_" }]) }; localStorage.setItem("__cap_test", JSON.stringify(t)); const cur = localStorage.getItem("__cap_test"); localStorage.removeItem("__cap_test"); return cur !== null; } catch (e) { return false; } })();
+          if (!ok && !confirm("当前相册空间不足，可能无法保存大图，仍要继续吗？")) { hint.textContent = "已取消上传。"; return; }
+          const r = STORE.galleryUpload(albumId, dataUrl, f.name);
+          if (!r.ok) { alert(r.msg); hint.textContent = "上传失败：" + r.msg; return; }
+          hint.textContent = "上传成功！图片已自动压缩。";
+          document.getElementById("inpFile").value = "";
+          render();
+        } catch (e) {
+          hint.textContent = "无法读取该图片文件，请换一张。";
+        }
+      });
+    } else {
+      document.getElementById("heroSub").textContent = "游客可浏览班级相册。登录成为本班成员或家长后，即可上传照片。";
+    }
+  })();
+  </script>
 </body>
 </html>

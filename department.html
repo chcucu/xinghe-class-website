@@ -47,6 +47,27 @@
       <div id="publishedList"></div>
     </section>
 
+    <!-- 编辑部：星河小报合集 -->
+    <section id="xiaobaoSec" style="display:none;">
+      <div class="section-head" style="margin-top:34px;">
+        <span class="eyebrow">XingHe Newspaper</span>
+        <h2 class="section-title">星河小报合集</h2>
+      </div>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px;">班级编辑部出品的电子小报，点击即可在线查看或下载。</p>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;">
+        <a class="panel xb-link" href="docx/星河小报%2001期20251107.pdf" target="_blank" rel="noopener">
+          <span class="xb-badge">第 01 期</span>
+          <b class="xb-name">星河小报 · 创刊号</b>
+          <span class="ri-cost">2025-11-07 · 点击查看 / 下载</span>
+        </a>
+        <a class="panel xb-link" href="docx/星河小报%2002期20251220.pdf" target="_blank" rel="noopener">
+          <span class="xb-badge">第 02 期</span>
+          <b class="xb-name">星河小报 · 十二月</b>
+          <span class="ri-cost">2025-12-20 · 点击查看 / 下载</span>
+        </a>
+      </div>
+    </section>
+
     <!-- 匿名举报（仅纪检部） -->
     <section id="reportSec" style="display:none;">
       <div class="panel" style="margin-top:34px;">
@@ -187,6 +208,7 @@
     document.getElementById("deptTitle").textContent = conf.title;
     document.getElementById("deptDesc").textContent = conf.desc;
     document.getElementById("pubTitle").textContent = conf.name + " · 已发布";
+    if (isBianji) document.getElementById("xiaobaoSec").style.display = "";
 
     function renderPublished() {
       const list = sortItems(STORE.getDeptItems(deptId).filter((x) => x.status === "published"));

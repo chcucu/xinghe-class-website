@@ -401,6 +401,24 @@ img { max-width: 100%; display: block; }
 .gallery-item:hover .cap { opacity:1; transform:none; }
 .gallery-item .album-tag { position:absolute; top:12px; left:12px; background:rgba(0,0,0,.72); color:#fff; font-size:11.5px; padding:4px 10px; border-radius:999px; z-index:2; backdrop-filter:blur(4px); font-family: var(--font-play); }
 
+/* 公开相册：上传者 / 名称 / 管理 */
+.gallery-item.gb-item { z-index: 1; }
+.gallery-item.gb-item img { position:absolute; inset:0; width:100%; height:100%; }
+.gb-up, .gb-op { font-family: var(--font-play); }
+.gb-up { position:absolute; top:10px; left:10px; z-index:3; background:rgba(0,0,0,.68); color:#fff; font-size:11px; padding:3px 9px; border-radius:999px; backdrop-filter:blur(4px); max-width:78%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gb-cap { position:absolute; left:0; right:0; bottom:0; z-index:2; padding:32px 12px 9px; background:linear-gradient(transparent, rgba(0,0,0,.82)); color:#fff; font-size:13px; font-family: var(--font-light); text-shadow:0 1px 2px rgba(0,0,0,.4); }
+.gb-ops { position:absolute; top:8px; right:8px; z-index:4; display:flex; gap:6px; }
+.gb-op { background:rgba(255,255,255,.92); color:#0a0a0a; border:none; font-size:11.5px; padding:5px 10px; border-radius:999px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.28); }
+.gb-op:hover { background:#fff; }
+.gb-op.gb-del { background:rgba(220,38,38,.92); color:#fff; }
+.gallery-item.gb-item:hover .gb-cap { transform:none; opacity:1; }
+
+/* 编辑部：星河小报合集卡片 */
+.xb-link { flex:1; min-width:240px; cursor:pointer; text-decoration:none; transition: transform .18s, box-shadow .18s, border-color .18s; }
+.xb-link:hover { transform: translateY(-3px); border-color:#000; }
+.xb-badge { display:inline-block; background:#000; color:#fff; font-size:11px; font-family:var(--font-play); padding:3px 10px; border-radius:999px; margin-bottom:10px; }
+.xb-name { display:block; font-size:18px; color:var(--ink); font-family:var(--font-light); margin-bottom:6px; }
+
 .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.92); display:none; align-items:center; justify-content:center; z-index:200; padding:24px; }
 .lightbox.open { display:flex; }
 .lightbox img { max-width:92vw; max-height:84vh; border-radius:14px; }
@@ -516,6 +534,7 @@ img { max-width: 100%; display: block; }
 .auth-logo img { width: 100%; height: 100%; object-fit: cover; }
 .auth-title { font-family: var(--font-light); font-weight: 400; font-size: 28px; text-align: center; margin-bottom: 6px; }
 .auth-sub { text-align: center; font-size: 13.5px; color: var(--text-soft); margin-bottom: 30px; }
+.auth-note { text-align:center; font-size: 12.5px; line-height: 1.75; color: var(--text-soft); background: var(--bg-soft); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 18px; }
 
 .field { margin-bottom: 18px; }
 .field label { display: block; font-size: 13px; color: var(--text-soft); margin-bottom: 7px; font-family: var(--font-play); letter-spacing: .04em; }
