@@ -6,10 +6,19 @@
 
 // 密码哈希 —— Cloudflare Workers 无原生 Node crypto 的 bcrypt，
 // 这里用 Web Crypto (SHA-256 + 加盐)，纯 JS 安全可用。
+async function sha256hex(s) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function genSalt() {
+  const a = new Uint8Array(16);
+  crypto.getRandomValues(a);
+  return [...a].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+// 新密码统一加盐存储（与前端 store.js 完全一致）：`<32位盐hex>.<64位摘要hex>`
 async function hashPassword(password) {
-  const data = new TextEncoder().encode(password);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const s = String(password == null ? "" : password);
+  return genSalt() + "." + (await sha256hex(s));
 }
 
 function json(data, status = 200) {
@@ -71,12 +80,46 @@ async function verifyToken(token) {
   return id || null;
 }
 
-// 校验密码：兼容已哈希 / 旧明文，一律返回新哈希（并存库升级）
+// 校验密码，返回：true(已加盐且匹配) / 新哈希(需升级为加盐) / null(密码错)。
+// 兼容：新加盐 `盐.摘要`、旧 SHA-256(64hex)、以及最早期明文。
+const SALTED_RE = /^[0-9a-f]{32}\.[0-9a-f]{64}$/i;
 async function checkPassword(plain, stored) {
-  const ok = IS_HASH_RE.test(stored)
-    ? (await hashPassword(plain)).toLowerCase() === stored.toLowerCase()
-    : plain === stored;
-  return ok ? await hashPassword(plain) : null;
+  stored = String(stored == null ? "" : stored);
+  if (SALTED_RE.test(stored)) {
+    const salt = stored.slice(0, 32), dg = stored.slice(33);
+    return (await sha256hex(salt + String(plain))).toLowerCase() === dg.toLowerCase() ? true : null;
+  }
+  if (IS_HASH_RE.test(stored)) {
+    return (await sha256hex(String(plain))).toLowerCase() === stored.toLowerCase() ? hashPassword(String(plain)) : null;
+  }
+  if (String(plain) === stored) return hashPassword(String(plain)); // 旧明文 → 升级加盐
+  return null;
+}
+
+// ---- R2 图片：上传(base64 解为二进制) 与 读取 ----
+// 未绑定 BUCKET 时返回 R2_OFF，前端自动回退为 base64 内嵌存储，因而安全降级、不破坏现有数据。
+async function uploadFile(request, env) {
+  if (!env.BUCKET) return { ok: false, code: "R2_OFF", msg: "R2 存储未绑定" };
+  const { data, ext, mime } = await request.json();
+  if (!data) return { ok: false, msg: "缺少图片数据" };
+  let bytes;
+  try { bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0)); } catch (e) { return { ok: false, msg: "图片编码错误" }; }
+  if (!bytes.length) return { ok: false, msg: "图片为空" };
+  const key = "img/" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8) + "." + (ext || "jpg");
+  await env.BUCKET.put(key, bytes, { httpMetadata: { contentType: mime || "image/jpeg" } });
+  return { ok: true, key };
+}
+
+async function servePhoto(path, env) {
+  if (!env.BUCKET) return json({ ok: false, msg: "R2 存储未绑定" }, 404);
+  const key = path.slice("/photos/".length);
+  const obj = await env.BUCKET.get(key);
+  if (!obj) return json({ ok: false, msg: "图片不存在" }, 404);
+  const headers = {
+    "Content-Type": (obj.httpMetadata && obj.httpMetadata.contentType) || "application/octet-stream",
+    "Cache-Control": "public, max-age=31536000, immutable",
+  };
+  return new Response(obj.body, { headers });
 }
 
 export default {
@@ -104,10 +147,13 @@ export default {
       else if (path === "/leaderboard" && method === "GET") result = leaderboard(env);
       else if (path === "/docs" && method === "GET") result = await getDocs(request, env);
       else if (path === "/docs/bootstrap" && method === "POST") result = await docsBootstrap(request, env);
+      // R2 图片（公开读取）
+      else if (path.indexOf("/photos/") === 0 && method === "GET") result = await servePhoto(path, env);
       // 需登录
       else if (!auth) return json({ ok: false, msg: "未登录或登录已过期" }, 401);
       else {
         switch (true) {
+          case path === "/upload" && method === "POST": result = await uploadFile(request, env); break;
           case path === "/me" && method === "GET": result = me(auth); break;
           case path === "/me/update" && method === "POST": result = await updateMe(request, env, auth); break;
           case path === "/change-password" && method === "POST": result = await changePassword(request, env, auth); break;
@@ -160,13 +206,13 @@ async function docsLogin(request, env) {
   try { users = JSON.parse(row.value); } catch (e) { return { ok: false, msg: "用户数据损坏" }; }
   const u = users.find((x) => x.account === account);
   if (!u) return { ok: false, msg: "账号不存在" };
-  const newHash = await checkPassword(password, u.password);
-  if (!newHash) return { ok: false, msg: "密码错误" };
+  const pwRes = await checkPassword(password, u.password);
+  if (!pwRes) return { ok: false, msg: "密码错误" };
   if (u.status === "pending") return { ok: false, msg: "该账号待班主任审核，通过后方可登录" };
   if (u.status === "rejected") return { ok: false, msg: "该注册申请未通过审核" };
-  // 旧明文升级为哈希（个人密码经由登录验证，由服务端写回）
-  if (!IS_HASH_RE.test(u.password)) {
-    u.password = newHash;
+  // 旧明文 / 旧 SHA-256 升级为加盐哈希；已加盐且匹配（pwRes===true）则无需写库
+  if (pwRes !== true && pwRes !== u.password) {
+    u.password = pwRes;
     await env.DB.prepare(
       "INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('users', ?, datetime('now'))"
     ).bind(JSON.stringify(users)).run();
@@ -177,13 +223,12 @@ async function docsLogin(request, env) {
 async function doLogin(request, env) {
   const { account, password } = await request.json();
   if (!account || !password) return { ok: false, msg: "请填写账号和密码" };
-  const hash = await hashPassword(password);
   const u = await env.DB.prepare("SELECT * FROM users WHERE account = ?").bind(account).first();
   if (!u) return { ok: false, msg: "账号不存在" };
-  if (u.password_hash !== hash) return { ok: false, msg: "密码错误" };
+  if ((await checkPassword(password, u.password_hash)) === null) return { ok: false, msg: "密码错误" };
   return {
     ok: true,
-    token: btoa(u.id),
+    token: await signToken(u.id),
     user: { id: u.id, name: u.name, role: u.role, mustChange: !!u.must_change },
   };
 }

@@ -205,7 +205,7 @@
       const cur = STORE.refreshSession();
       const preview = document.getElementById("avatarPreview");
       if (cur && cur.avatar) {
-        preview.innerHTML = '<img src="' + cur.avatar + '" style="width:100%;height:100%;object-fit:cover;">';
+        preview.innerHTML = '<img src="' + STORE.resolveImg(cur.avatar) + '" style="width:100%;height:100%;object-fit:cover;">';
       } else {
         preview.innerHTML = '<span style="font-family:var(--font-light);font-size:30px;color:var(--muted);">' + esc((s.name || "星").charAt(0)) + '</span>';
       }
@@ -231,7 +231,7 @@
       if (!imgs.length) { host.innerHTML = '<p class="hint" style="color:var(--muted);grid-column:1/-1;">还没有上传图片。</p>'; return; }
       host.innerHTML = imgs.map((im, i) =>
         '<div style="position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;aspect-ratio:1;">' +
-        '<img src="' + im.src + '" style="width:100%;height:100%;object-fit:cover;">' +
+        '<img src="' + STORE.resolveImg(im.src) + '" style="width:100%;height:100%;object-fit:cover;">' +
         '<button data-delimg="' + i + '" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:8px;padding:3px 9px;cursor:pointer;font-size:12px;">删除</button></div>'
       ).join("");
       host.querySelectorAll("[data-delimg]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认删除这张图片？")) return; STORE.deletePersonalImage(b.dataset.delimg); renderImgs(); }));
@@ -262,7 +262,8 @@
       if (!f) return;
       try {
         const dataUrl = await IMG.toDataUrl(f, { maxWidthOrHeight: 640 }); // 头像压缩到约 640px
-        const r = STORE.setAvatar(dataUrl);
+        const src = await STORE.uploadImg(dataUrl, "jpg");
+        const r = STORE.setAvatar(src);
         if (r.ok) { alert("头像已更新"); renderAvatar(); }
         else alert(r.msg);
       } catch (e) { alert((e && e.message) ? e.message : "无法读取该图片，请换一张"); }
@@ -285,7 +286,8 @@
       if (!f) return;
       try {
         const dataUrl = await IMG.toDataUrl(f);
-        const r = STORE.addPersonalImage(dataUrl);
+        const src = await STORE.uploadImg(dataUrl, "jpg");
+        const r = STORE.addPersonalImage(src);
         if (r.ok) { renderImgs(); } else alert(r.msg);
       } catch (e) { alert((e && e.message) ? e.message : "无法读取该图片，请换一张"); }
       imgInput.value = "";

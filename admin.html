@@ -278,7 +278,7 @@
     }));
 
     function avatarHtml(u) {
-      if (u.avatar) return '<span class="admin-avatar"><img src="' + u.avatar + '" alt=""></span>';
+      if (u.avatar) return '<span class="admin-avatar"><img src="' + STORE.resolveImg(u.avatar) + '" alt=""></span>';
       return '<span class="admin-avatar">' + esc((u.name || "星").charAt(0)) + '</span>';
     }
     function dispName(u) { return u.nickname || u.name; }

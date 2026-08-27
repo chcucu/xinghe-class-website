@@ -165,7 +165,7 @@
         const display = STORE.displayName(u);
         const initial = (display || "星").charAt(0);
         const avatarHtml = u.avatar
-          ? `<img src="${esc(u.avatar)}" alt="${esc(display)}">`
+          ? `<img src="${esc(STORE.resolveImg(u.avatar))}" alt="${esc(display)}">`
           : `<i></i>${esc(initial)}`;
         const meta = u.nickname ? "本名 " + esc(u.name) : "八年级一班";
         return `

@@ -242,32 +242,66 @@ const STORE = (function () {
     return neg ? "-" + a : a;
   }
 
-  /* ---------- 密码哈希（SHA-256，绝不存明文） ---------- */
-  // 与后端 worker.js 的 hashPassword 保持一致（64 位小写 hex），便于前后端互通。
-  async function hashPassword(pw) {
-    const s = String(pw == null ? "" : pw);
-    try {
-      if (typeof crypto !== "undefined" && crypto.subtle) {
-        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-        return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-      }
-    } catch (e) { /* 退到同步兜底 */ }
-    // 极旧 / 非安全上下文兜底：保证不漏明文。正常部署(https/localhost)不会走到这里。
-    return syncHashFallback(s);
+  /* ---------- 密码哈希（SHA-256 + 随机盐，绝不存明文） ---------- */
+  // 加盐格式：`<32位盐hex>.<64位摘要hex>`，与后端 worker.js 完全一致，前后端互通。
+  const SALTED_RE = /^[0-9a-f]{32}\.[0-9a-f]{64}$/i;
+  function hexBytes(buf) {
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
   }
-  // 同步兜底哈希（仅在本机无 Web Crypto 时使用，防控明文）
-  function syncHashFallback(s) {
+  // 同步兜底（在极旧 / 非安全上下文下的降级，仅用于防明文，正常部署不会走这里）
+  function fnvHex(s) {
     let h1 = 0x811c9dc5, h2 = 0x01000193;
     for (let i = 0; i < s.length; i++) {
       const c = s.charCodeAt(i);
       h1 = Math.imul(h1 ^ c, 0x01000193);
       h2 = Math.imul(h2, 33) ^ c;
     }
-    return "sync-" + (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
+    return (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
   }
-  // 判断数据库中密码是否已是哈希（而非旧明文）
+  async function digestHex(s) {
+    if (typeof crypto !== "undefined" && crypto.subtle) {
+      try {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+        return hexBytes(buf);
+      } catch (e) { /* 退到同步兜底 */ }
+    }
+    return "sync-" + fnvHex(s);
+  }
+  function genSalt() {
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      const a = new Uint8Array(16);
+      crypto.getRandomValues(a);
+      return hexBytes(a); // 32 位 hex
+    }
+    return fnvHex(Date.now() + "-" + Math.random()); // 兜底
+  }
+  // 新密码统一加盐存储
+  async function hashPassword(pw) {
+    const s = String(pw == null ? "" : pw);
+    if (typeof crypto !== "undefined" && crypto.subtle) {
+      const salt = genSalt();
+      return salt + "." + (await digestHex(salt + s));
+    }
+    return digestHex(s); // 非安全上下文的降级形态
+  }
+  // 校验：兼容【新加盐 / 旧 SHA-256 / 旧明文】，返回 true(已加盐且匹配)、新哈希(需升级)、或 null(密码错)
+  async function verifyPw(plain, stored) {
+    stored = String(stored == null ? "" : stored);
+    if (SALTED_RE.test(stored)) {
+      const salt = stored.slice(0, 32), dg = stored.slice(33);
+      return (await digestHex(salt + String(plain))) === dg ? true : null;
+    }
+    if (/^[0-9a-f]{64}$/i.test(stored)) {
+      return (await digestHex(String(plain))) === stored ? hashPassword(String(plain)) : null;
+    }
+    if (/^sync-/.test(stored)) {
+      return ("sync-" + fnvHex(String(plain))) === stored ? hashPassword(String(plain)) : null;
+    }
+    return String(plain) === stored ? hashPassword(String(plain)) : null;
+  }
+  // 判断是否已是某种哈希（不再落明文）
   function isHashed(pw) {
-    return typeof pw === "string" && (/^[0-9a-f]{64}$/i.test(pw) || /^sync-/.test(pw));
+    return typeof pw === "string" && (SALTED_RE.test(pw) || /^[0-9a-f]{64}$/i.test(pw) || /^sync-/.test(pw));
   }
 
   /* ---------- 初始化种子 ---------- */
@@ -535,16 +569,11 @@ const STORE = (function () {
     const users = getUsers();
     const u = users.find((x) => x.account === account);
     if (!u) return { ok: false, msg: "账号不存在" };
+    // 加盐/旧SHA256/旧明文 兼容校验；需升级时这里自动写回加盐哈希
+    const vh = await verifyPw(password, u.password);
+    if (vh === null) return { ok: false, msg: "密码错误" };
     let upgraded = false;
-    // 已哈希：比对哈希；旧明文：兼容比对，成功后自动升级为哈希存储
-    if (isHashed(u.password)) {
-      if ((await hashPassword(password)) !== u.password) return { ok: false, msg: "密码错误" };
-    } else {
-      if (u.password !== password) return { ok: false, msg: "密码错误" };
-      u.password = await hashPassword(password); // 明文 → 哈希升级
-      saveUsers(users);
-      upgraded = true;
-    }
+    if (vh !== true && vh !== u.password) { u.password = vh; saveUsers(users); upgraded = true; }
     if (u.status === "pending") return { ok: false, msg: "该账号待班主任审核，通过后方可登录" };
     if (u.status === "rejected") return { ok: false, msg: "该注册申请未通过审核" };
     const session = {
@@ -943,7 +972,7 @@ const STORE = (function () {
   function setAvatar(dataUrl) {
     const s = getSession();
     if (!s) return { ok: false, msg: "未登录" };
-    if (!dataUrl || !String(dataUrl).startsWith("data:image")) return { ok: false, msg: "图片无效" };
+    if (!isImgSrc(dataUrl)) return { ok: false, msg: "图片无效" };
     const users = getUsers();
     const u = users.find((x) => x.id === s.id);
     if (!u) return { ok: false, msg: "用户不存在" };
@@ -1075,7 +1104,7 @@ const STORE = (function () {
 
   function addPersonalImage(dataUrl) {
     const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
-    if (!dataUrl || !String(dataUrl).startsWith("data:image")) return { ok: false, msg: "图片无效" };
+    if (!isImgSrc(dataUrl)) return { ok: false, msg: "图片无效" };
     const users = getUsers();
     const u = users.find((x) => x.id === s.id);
     if (!u) return { ok: false, msg: "用户不存在" };
@@ -1843,6 +1872,33 @@ const STORE = (function () {
   }
 
   /* ---------- 公开 API ---------- */
+  /* ---------- R2 图片：上传 / 解析 ---------- */
+  // 合法的图源：base64 data:image 或 R2 引用 r2:xxx。
+  function isImgSrc(src) {
+    return !!(src && (String(src).indexOf("data:image") === 0 || String(src).indexOf("r2:") === 0));
+  }
+  // 上传：远程模式把 base64 推给 Worker 存 R2，成功返回 "r2:<key>"；否则安全回退原 base64。
+  async function uploadImg(dataUrl, ext) {
+    if (!isRemote()) return dataUrl;
+    try {
+      const m = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl);
+      if (!m) return dataUrl;
+      const r = await fetch(apiBase + "/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiToken() },
+        body: JSON.stringify({ data: m[2], ext: ext || "jpg", mime: m[1] }),
+      });
+      const d = await r.json();
+      return (d && d.ok && d.key) ? ("r2:" + d.key) : dataUrl;
+    } catch (e) { return dataUrl; }
+  }
+  // 解析：把 "r2:<key>" 还原为可访问的图片地址；其余（base64 / 普通URL）原样返回。
+  function resolveImg(src) {
+    if (!src) return "";
+    if (typeof src === "string" && src.indexOf("r2:") === 0) return apiBase + "/photos/" + src.slice(3);
+    return src;
+  }
+
   return {
     apiBase,
     ensureSeeded,
@@ -1868,6 +1924,7 @@ const STORE = (function () {
     getNotices, addNotice, deleteNotice,
     getDuty, addDutyShift, deleteDutyShift,
     updateProfile, addPersonalImage, deletePersonalImage,
+    uploadImg, resolveImg,
     grantBadge, revokeBadge,
     getGroups, saveGroups, setUserGroup, groupStats,
     getWall, postWall, deleteWall,

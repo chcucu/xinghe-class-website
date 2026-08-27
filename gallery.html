@@ -171,7 +171,7 @@
         const a = list.find((al) => al.id === p.albumId);
         const manage = canManage(p);
         return '<div class="gallery-item gb-item" data-id="' + p.id + '">' +
-          '<img src="' + p.src + '" alt="' + esc(p.name) + '" loading="lazy">' +
+          '<img src="' + STORE.resolveImg(p.src) + '" alt="' + esc(p.name) + '" loading="lazy">' +
           '<span class="gb-up">' + esc(p.uploaderName || "班级相册") + '</span>' +
           '<span class="gb-cap">' + esc(p.name) + '</span>' +
           (manage ? '<span class="gb-ops"><button class="gb-op" data-rn="' + p.id + '">改名</button><button class="gb-op gb-del" data-del="' + p.id + '">删除</button></span>' : "") +
@@ -198,7 +198,7 @@
       }));
 
       // 灯箱打开（点照片卡片）
-      const view = shown.map((p) => ({ src: p.src, name: p.name, up: p.uploaderName }));
+      const view = shown.map((p) => ({ src: STORE.resolveImg(p.src), name: p.name, up: p.uploaderName }));
       grid.querySelectorAll(".gb-item").forEach((el, i) => {
         el.addEventListener("click", () => openLb(view, i));
       });
@@ -267,7 +267,8 @@
           const g2 = STORE.galleryGet();
           const ok = (function () { try { const t = { albums: g2.albums, photos: g2.photos.concat([{ id: "_", albumId, name: "_" }]) }; localStorage.setItem("__cap_test", JSON.stringify(t)); const cur = localStorage.getItem("__cap_test"); localStorage.removeItem("__cap_test"); return cur !== null; } catch (e) { return false; } })();
           if (!ok && !confirm("当前相册空间不足，可能无法保存大图，仍要继续吗？")) { hint.textContent = "已取消上传。"; return; }
-          const r = STORE.galleryUpload(albumId, dataUrl, f.name);
+          const src = await STORE.uploadImg(dataUrl, "jpg");
+          const r = STORE.galleryUpload(albumId, src, f.name);
           if (!r.ok) { alert(r.msg); hint.textContent = "上传失败：" + r.msg; return; }
           hint.textContent = "上传成功！图片已自动压缩。";
           document.getElementById("inpFile").value = "";

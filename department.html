@@ -197,7 +197,7 @@
       if (item.notes) body += '<p style="font-size:13px;color:var(--muted);margin-top:8px;">' + esc(item.notes) + '</p>';
       let imgs = "";
       (item.cover ? [item.cover] : []).concat(item.evidence || []).forEach(function (src) {
-        if (src) imgs += '<img src="' + src + '" alt="佐证" style="max-width:220px;max-height:160px;border-radius:10px;object-fit:cover;margin:6px 6px 0 0;border:1px solid var(--line);">';
+        if (src) imgs += '<img src="' + STORE.resolveImg(src) + '" alt="佐证" style="max-width:220px;max-height:160px;border-radius:10px;object-fit:cover;margin:6px 6px 0 0;border:1px solid var(--line);">';
       });
       const author = esc(item.authorName || item.author);
       return '<div class="panel" style="margin-bottom:16px;">' + body + (imgs ? '<div style="display:flex;flex-wrap:wrap;">' + imgs + '</div>' : "") +
@@ -244,7 +244,8 @@
         if (!f) return;
         try {
           const dataUrl = await IMG.toDataUrl(f);
-          repEvidence.push(dataUrl);
+          const src = await STORE.uploadImg(dataUrl, "jpg");
+          repEvidence.push(src);
           document.getElementById("repFileHint").textContent = "已添加 " + repEvidence.length + " 张佐证";
         } catch (e) { alert((e && e.message) ? e.message : "无法读取该图片，请换一张"); }
         this.value = "";
@@ -290,7 +291,7 @@
             if (!f) return;
             try {
               const dataUrl = await IMG.toDataUrl(f);
-              inp._val = dataUrl;
+              inp._val = await STORE.uploadImg(dataUrl, "jpg");
               if (hint) hint.textContent = "已压缩上传";
             } catch (e) { alert((e && e.message) ? e.message : "无法读取该图片，请换一张"); }
           });
