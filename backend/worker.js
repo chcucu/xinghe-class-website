@@ -32,7 +32,7 @@ export default {
     // 简化 CORS
     const cors = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     };
     if (method === "OPTIONS") return new Response(null, { headers: cors });
@@ -75,13 +75,20 @@ export default {
 };
 
 // ---- 认证：Authorization: Bearer <token>，token = base64(id) ----
+// 用户身份以 docs 表的 users 文档为唯一数据源（与前端一致），
+// 因此后端登录校验也直接查 docs，避免维护两份用户表。
 async function authenticate(request, env) {
   const h = request.headers.get("Authorization") || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
   if (!token) return null;
-  const id = atob(token);
-  const u = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first();
-  return u || null;
+  let id;
+  try { id = atob(token); } catch (e) { return null; }
+  const row = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
+  if (!row) return null;
+  let users;
+  try { users = JSON.parse(row.value); } catch (e) { return null; }
+  const u = users.find((x) => x.id === id);
+  return u ? { id: u.id, name: u.name, role: u.role } : null;
 }
 
 async function doLogin(request, env) {
