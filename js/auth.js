@@ -44,7 +44,7 @@
   // 登录
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (tp && !tp.verify()) { showError("请先完成人机验证（按提示顺序点选文字）"); if (tp.refresh) tp.refresh(); return; }
+    if (tp && !tp.verify()) { showError("请先完成人机验证（滑动滑块到底）"); if (tp.refresh) tp.refresh(); return; }
     const account = document.getElementById("account").value.trim();
     const password = document.getElementById("password").value;
     if (!account || !password) { showError("请填写账号和密码"); return; }

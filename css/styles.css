@@ -509,27 +509,46 @@ img { max-width: 100%; display: block; }
 }
 .pw-eye:hover { color: var(--ink); background: rgba(0,0,0,.05); }
 
-/* 文字点选人机验证 */
-.textpick { margin: 4px 0 14px; border: 1px solid var(--line-2); border-radius: var(--radius); padding: 12px; background: #fff; }
-.tp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-.tp-title { font-family: var(--font-play); font-size: 12px; letter-spacing: .06em; color: var(--ink); white-space: nowrap; }
-.tp-tip { font-size: 13px; color: var(--text-soft); text-align: right; line-height: 1.5; }
-.tp-tip b { color: var(--ink); font-weight: 700; margin: 0 1px; }
-.tp-stage { border-radius: 10px; overflow: hidden; }
-.tp-canvas { width: 100%; height: auto; display: block; cursor: pointer; background: #f4f4f6; }
-.tp-state { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
-.tp-refresh {
+/* 滑钮人机验证（手机/平板/电脑通用） */
+.textpick { margin: 4px 0 14px; border: 1px solid var(--line-2); border-radius: var(--radius); padding: 10px; background: #fff; }
+.tp-slider { user-select: none; -webkit-user-select: none; }
+.tp-slider .tp-st { position: relative; height: 46px; border-radius: 999px; overflow: hidden; touch-action: none; }
+.tp-slider .tp-slider-track { position: absolute; inset: 0; background: #f1f1f3; border: 1px solid var(--line-2); border-radius: 999px; }
+.tp-slider .tp-slider-fill { position: absolute; top: 0; left: 0; bottom: 0; background: rgba(26,122,58,.14); border-radius: 999px; }
+.tp-slider .tp-slider-text {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 13.5px; color: var(--text-soft); letter-spacing: .02em; pointer-events: none; text-align: center; padding: 0 12px;
+}
+.tp-slider .tp-slider-ok {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 46px;
+  display: grid; place-items: center; color: #fff; font-size: 20px; font-weight: 700;
+  opacity: 0; transform: translateX(100%); transition: opacity .2s, transform .2s;
+}
+.tp-slider .tp-slider-knob {
+  position: absolute; top: 0; left: 0; width: 46px; height: 46px;
+  display: grid; place-items: center;
+  background: #000; color: #fff; border-radius: 999px; cursor: grab;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25); touch-action: none; z-index: 2;
+  transition: box-shadow .15s, background .15s;
+}
+.tp-slider .tp-slider-knob.active { cursor: grabbing; box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+.tp-slider.done .tp-slider-knob { background: #1a7a3a; cursor: default; }
+.tp-slider.done .tp-slider-text { opacity: 0; }
+.tp-slider.done .tp-slider-ok { opacity: 1; transform: translateX(0); }
+.tp-slider.done .tp-slider-track { background: rgba(26,122,58,.12); border-color: rgba(26,122,58,.3); }
+.tp-slider.nudge { animation: tpnudge .36s; }
+@keyframes tpnudge { 0%,100%{transform:translateX(0)} 30%{transform:translateX(-6px)} 70%{transform:translateX(6px)} }
+.tp-slider .tp-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.tp-slider .tp-msg { font-size: 12.5px; min-height: 18px; }
+.tp-slider .tp-msg.ok { color: #1a7a3a; }
+.tp-slider .tp-msg.err { color: #b30000; }
+.tp-slider .tp-refresh {
   font-size: 12.5px; color: var(--ink); cursor: pointer;
   border: 1px solid var(--line-2); background: #fafafa;
   padding: 5px 14px; border-radius: 999px; font-family: var(--font-body);
   transition: background .15s, border-color .15s; flex: none;
 }
-.tp-refresh:hover { background: #000; color: #fff; border-color: #000; }
-.tp-msg { font-size: 12.5px; min-height: 18px; }
-.tp-msg.ok { color: #1a7a3a; }
-.tp-msg.err { color: #b30000; }
-.textpick.shake { animation: tpshake .4s; }
-@keyframes tpshake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+.tp-slider .tp-refresh:hover { background: #000; color: #fff; border-color: #000; }
 .auth-card { width: 100%; max-width: 460px; background: var(--card-solid); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 44px 40px; }
 .auth-card .win-tl { margin-bottom: 22px; }
 .auth-logo { width: 64px; height: 64px; border-radius: 16px; overflow: hidden; margin: 0 auto 18px; border: 1px solid var(--line); }

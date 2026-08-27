@@ -1,127 +1,145 @@
 /* ============================================================
-  星河班 · 文字点选人机验证（自包含，前端判断）
-  在容器内生成若干随机汉字，按提示顺序点选文字以通过校验。
+  星河班 · 滑钮式人机验证（自包含，前端判断）
+  手机 / 平板 / 电脑通用：按住右侧滑块，向右拖动到底即通过。
+  使用 Pointer Events，触屏与鼠标统一处理。
   暴露 window.TEXTPICK = { create(containerId) -> { verify, refresh } }
   ============================================================ */
 (function () {
-  var POOL = "星河班春夏秋冬心梦想望勤奋诚相信你我他来去往东西高远清晨暮光读书写字谦礼智信勇毅矩温良恭俭让";
-
-  function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
-
-  function build() {
-    var used = [];
-    while (used.length < 6) {
-      var c = POOL[randInt(0, POOL.length - 1)];
-      if (used.indexOf(c) < 0) used.push(c);
-    }
-    var order = used.slice(0, 3);
-    var items = used.map(function (ch) {
-      return { ch: ch, x: randInt(5, 251), y: randInt(5, 71), angle: randInt(-22, 22), dark: randInt(0, 1) === 0, done: false };
-    });
-    return { items: items, order: order };
+  // 生成验证单元 DOM（安全方式，不使用 innerHTML 拼接脚本）
+  function elFrom(html) {
+    var d = document.createElement("div");
+    d.innerHTML = html;
+    return d.firstChild;
   }
 
-  function draw(ctx, cfg, canvas) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#f4f4f6";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "rgba(0,0,0,.1)";
-    for (var i = 0; i < 4; i++) {
-      ctx.beginPath();
-      ctx.moveTo(randInt(0, canvas.width), randInt(0, canvas.height));
-      ctx.lineTo(randInt(0, canvas.width), randInt(0, canvas.height));
-      ctx.stroke();
-    }
-    cfg.items.forEach(function (it) {
-      ctx.save();
-      ctx.translate(it.x + 22, it.y + 26);
-      ctx.rotate((it.angle * Math.PI) / 180);
-      ctx.font = "700 26px 'Noto Serif SC', 'Songti SC', serif";
-      if (it.done) {
-        ctx.fillStyle = "rgba(0,0,0,.25)";
-        ctx.fillText(it.ch, -13, 8);
-        ctx.strokeStyle = "rgba(0,0,0,.35)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-10, 7); ctx.lineTo(10, -7);
-        ctx.moveTo(-10, -7); ctx.lineTo(10, 7);
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = it.dark ? "#0a0a0a" : "#4a4a50";
-        ctx.fillText(it.ch, -13, 8);
-      }
-      ctx.restore();
-    });
+  function svgChevron() {
+    return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
   }
 
   function create(containerId) {
     var wrap = document.getElementById(containerId);
     if (!wrap) return null;
 
-    var cfg = null;
-    var inputs = [];
+    var state = { done: false, dragging: false, startX: 0, startKnob: 0 };
 
-    function render() {
-      wrap.innerHTML =
-        '<div class="tp-head"><span class="tp-title">人机验证</span><span class="tp-tip">请按顺序点选：' +
-        cfg.order.map(function (c) { return "<b>" + c + "</b>"; }).join("") +
-        '</span></div>' +
-        '<div class="tp-stage"><canvas width="300" height="120" class="tp-canvas"></canvas></div>' +
-        '<div class="tp-state"><span class="tp-msg"></span><button type="button" class="tp-refresh">换一批</button></div>';
-      var canvas = wrap.querySelector(".tp-canvas");
-      var ctx = canvas.getContext("2d");
+    var el = elFrom(
+      '<div class="tp-slider">' +
+        '<div class="tp-st">' +
+          '<div class="tp-slider-track"></div>' +
+          '<div class="tp-slider-fill" style="width:0"></div>' +
+          '<div class="tp-slider-text">按住滑块，向右拖动到底完成验证</div>' +
+          '<div class="tp-slider-ok">✓</div>' +
+          '<div class="tp-slider-knob" role="slider" aria-label="拖动完成验证">' + svgChevron() + '</div>' +
+        '</div>' +
+        '<div class="tp-foot">' +
+          '<span class="tp-msg"></span>' +
+          '<button type="button" class="tp-refresh">换一个</button>' +
+        '</div>' +
+      '</div>'
+    );
 
-      canvas.addEventListener("click", function (e) {
-        if (cfg.done) return;
-        var rect = canvas.getBoundingClientRect();
-        var mx = ((e.clientX - rect.left) * canvas.width) / rect.width;
-        var my = ((e.clientY - rect.top) * canvas.height) / rect.height;
-        var hit = null;
-        for (var i = cfg.items.length - 1; i >= 0; i--) {
-          var it = cfg.items[i];
-          if (it.done) continue;
-          if (mx >= it.x && mx <= it.x + 44 && my >= it.y && my <= it.y + 44) { hit = it; break; }
-        }
-        if (!hit) return;
-        var expected = cfg.order[inputs.length];
-        if (hit.ch === expected) {
-          hit.done = true;
-          inputs.push(hit.ch);
-          if (inputs.length === cfg.order.length) {
-            cfg.done = true;
-            setMsg("验证通过", "ok");
-            for (var j = 0; j < cfg.items.length; j++) cfg.items[j].done = true;
-          }
-          draw(ctx, cfg, canvas);
-        } else {
-          setMsg("顺序错误，正在生成新验证码…", "err");
-          wrap.classList.add("shake");
-          setTimeout(function () { wrap.classList.remove("shake"); }, 400);
-          // 点错后自动换一批，无需手动查找刷新按钮
-          clearTimeout(wrap._autoRef);
-          wrap._autoRef = setTimeout(function () { refresh(); }, 850);
-        }
-      });
-
-      wrap.querySelector(".tp-refresh").addEventListener("click", function () { refresh(); });
-      draw(ctx, cfg, canvas);
-    }
+    var track = el.querySelector(".tp-slider-track");
+    var fill = el.querySelector(".tp-slider-fill");
+    var text = el.querySelector(".tp-slider-text");
+    var ok = el.querySelector(".tp-slider-ok");
+    var knob = el.querySelector(".tp-slider-knob");
+    var msg = el.querySelector(".tp-msg");
 
     function setMsg(t, kind) {
-      var m = wrap.querySelector(".tp-msg");
-      if (m) { m.textContent = t; m.className = "tp-msg " + (kind || ""); }
+      if (!msg) return;
+      msg.textContent = t || "";
+      msg.className = "tp-msg " + (kind || "");
     }
+
+    function trackW() { return track.clientWidth || 300; }
+    function knobW() { return knob.offsetWidth || 44; }
+
+    function setDone() {
+      state.done = true;
+      el.classList.add("done");
+      var w = trackW();
+      knob.style.left = (w - knobW()) + "px";
+      fill.style.width = "100%";
+      setMsg("验证通过", "ok");
+    }
+
+    function reset() {
+      state.done = false;
+      el.classList.remove("done");
+      knob.style.left = "0px";
+      fill.style.width = "0px";
+      knob.classList.remove("active");
+      el.classList.remove("nudge");
+      // 触发一次轻微抖动提示，避免静默无反馈
+      void el.offsetWidth;
+      el.classList.add("nudge");
+      setTimeout(function () { el.classList.remove("nudge"); }, 360);
+    }
+
+    function setPos(x) {
+      var maxX = trackW() - knobW();
+      var px = Math.max(0, Math.min(x, maxX));
+      knob.style.left = px + "px";
+      fill.style.width = (px + knobW()) + "px";
+      return px;
+    }
+
+    function onStart(e) {
+      if (state.done) return;
+      state.dragging = true;
+      state.startX = e.clientX;
+      state.startKnob = knob.offsetLeft || 0;
+      try { knob.setPointerCapture(e.pointerId); } catch (err) {}
+      knob.classList.add("active");
+      setMsg("", "");
+      e.preventDefault();
+    }
+
+    function onMove(e) {
+      if (!state.dragging) return;
+      setPos(state.startKnob + (e.clientX - state.startX));
+      e.preventDefault();
+    }
+
+    function onEnd() {
+      if (!state.dragging) return;
+      state.dragging = false;
+      knob.classList.remove("active");
+      var maxX = trackW() - knobW();
+      if ((knob.offsetLeft || 0) >= maxX - 6) {
+        setDone();
+      } else {
+        setMsg("未滑到底部，请重试", "err");
+        reset();
+      }
+    }
+
+    knob.addEventListener("pointerdown", onStart);
+    knob.addEventListener("pointermove", onMove);
+    knob.addEventListener("pointerup", onEnd);
+    knob.addEventListener("pointercancel", onEnd);
+    // 处理在滑块上按下但手指滑出滑块的情况
+    el.addEventListener("pointerup", onEnd);
 
     function refresh() {
-      cfg = build();
-      inputs = [];
-      render();
+      reset();
+      setMsg("", "");
+      el.classList.remove("done");
+      knob.style.left = "0px";
+      fill.style.width = "0px";
     }
+    el.querySelector(".tp-refresh").addEventListener("click", refresh);
 
+    wrap.innerHTML = "";
+    wrap.appendChild(el);
     refresh();
+
     return {
-      verify: function () { return !!(cfg && cfg.done); },
-      refresh: refresh
+      verify: function () { return state.done; },
+      refresh: function () {
+        refresh();
+        return state.done;
+      }
     };
   }
 
