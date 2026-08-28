@@ -18,7 +18,8 @@ function genSalt() {
 // 新密码统一加盐存储（与前端 store.js 完全一致）：`<32位盐hex>.<64位摘要hex>`
 async function hashPassword(password) {
   const s = String(password == null ? "" : password);
-  return genSalt() + "." + (await sha256hex(s));
+  const salt = genSalt();
+  return salt + "." + (await sha256hex(salt + s));
 }
 
 function json(data, status = 200) {
