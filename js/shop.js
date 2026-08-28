@@ -13,6 +13,96 @@
 
   const isShichang = STORE.canEditDept("shichang");
   const teacher = me.role === "teacher" || me.role === "admin" || me.role === "superadmin";
+  const isStudent = me.role === "student" || me.role === "superadmin";
+
+  /* ---- 零花钱兑换（孩子 ↔ 家长） ---- */
+  const cashoutPanel = document.getElementById("cashoutPanel");
+  if (isStudent) {
+    cashoutPanel.style.display = "";
+    renderCashout();
+  } else if (me.role === "parent") {
+    cashoutPanel.style.display = "";
+    document.getElementById("cashoutBox").innerHTML =
+      '<span class="muted-note">你是家长身份：请前往<a href="profile.html" style="color:var(--accent);">个人中心</a>设置兑换比例、审批孩子的零花钱申请并记录已兑换金额。</span>';
+  }
+
+  function renderCashout() {
+    const box = document.getElementById("cashoutBox");
+    const parent = STORE.myParent();
+    const rate = STORE.cashoutRate();
+    const self = STORE.findById(s.id);
+    const score = self ? self.score : 0;
+
+    if (!parent) {
+      box.innerHTML =
+        '<div class="pc-alert" style="border:1px dashed var(--line-2);border-radius:var(--radius-md);padding:14px;background:var(--bg-soft);">' +
+          '<b>尚未绑定家长</b><p class="muted-note" style="margin-top:6px;margin-bottom:0;">零花钱兑换需要先绑定家长。请让家长在<b>注册</b>时选择你作为“孩子”完成绑定；绑定后即可在这里用积分向家长兑换零花钱。</p>' +
+        '</div>' +
+        '<div id="cashoutHistory" style="margin-top:16px;"></div>';
+      renderCashoutHistory();
+      return;
+    }
+
+    const pname = esc(parent.name);
+    box.innerHTML =
+      '<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center;margin-bottom:16px;">' +
+        '<div style="flex:1;min-width:180px;"><span class="muted-note">当前积分</span><div style="font-family:var(--font-black);font-size:26px;">' + STORE.fmtMoney(score) + ' 分</div></div>' +
+        '<div style="flex:1;min-width:180px;"><span class="muted-note">兑换比例（家长 ' + pname + ' 设置）</span><div style="font-family:var(--font-black);font-size:26px;">1 分 = ' + rate + ' 元</div></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:12px;">' +
+        '<div class="field"><label>兑换积分</label><input class="mini" id="coPoints" type="number" step="0.01" min="0" placeholder="输入要兑换的积分" style="width:100%;"></div>' +
+        '<div class="field"><label>备注（可选）</label><input class="mini" id="coNote" maxlength="60" placeholder="例如：本周表现好，奖励一下" style="width:100%;"></div>' +
+        '<div class="field" style="display:flex;align-items:flex-end;gap:10px;">' +
+          '<button class="btn" id="btnCashout" style="flex:1;">提交兑换申请</button>' +
+          '<span class="muted-note" id="coPreview" style="line-height:1.3;flex:1;min-width:120px;"></span>' +
+        '</div>' +
+      '</div>' +
+      '<div id="cashoutHistory"></div>';
+
+    // 实时预览金额
+    const coPoints = document.getElementById("coPoints");
+    const coPreview = document.getElementById("coPreview");
+    const upd = () => {
+      const v = Number(coPoints.value);
+      if (isNaN(v) || v <= 0) { coPreview.textContent = ""; return; }
+      const m = Math.round(v * rate * 100) / 100;
+      coPreview.innerHTML = "约可兑换 <b style='font-family:var(--font-black);'>" + m + " 元</b>";
+    };
+    coPoints.addEventListener("input", upd);
+
+    document.getElementById("btnCashout").addEventListener("click", () => {
+      const r = STORE.applyCashout(coPoints.value, document.getElementById("coNote").value.trim());
+      if (r.ok) {
+        window.showToast("已向家长发送兑换申请：" + r.money + " 元，等待确认", "success");
+        coPoints.value = ""; document.getElementById("coNote").value = ""; upd();
+        renderCashoutHistory();
+      } else {
+        window.showToast(r.msg, "error");
+      }
+    });
+
+    renderCashoutHistory();
+  }
+
+  function renderCashoutHistory() {
+    const host = document.getElementById("cashoutHistory");
+    if (!host) return;
+    const list = STORE.myCashouts();
+    const stLabel = { pending: "待家长确认", paid: "已兑换", rejected: "家长已拒绝" };
+    const stColor = { pending: "var(--accent)", paid: "#1a7f37", rejected: "#b30000" };
+    host.innerHTML = list.length
+      ? '<div style="font-size:13px;margin-bottom:6px;"><b>我的兑换记录</b></div>' +
+        list.slice(0, 20).map((c) =>
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2);">' +
+            '<span>' + (c.type === "manual" ? "家长登记 · " : "") + STORE.fmtMoney(c.money) + ' 元' +
+              (c.type === "apply" ? ' <span class="muted-note">(' + c.points + ' 分)</span>' : "") +
+              (c.note ? ' <span class="muted-note">' + esc(c.note) + '</span>' : "") +
+            '</span>' +
+            '<span style="font-size:12.5px;color:' + stColor[c.status] + ';">' + (stLabel[c.status] || c.status) + '</span>' +
+          '</div>'
+        ).join("")
+      : '<span class="muted-note">还没有兑换记录。</span>';
+  }
 
   /* ---- 市监局审批面板 ---- */
   const shichangPanel = document.getElementById("shichangPanel");

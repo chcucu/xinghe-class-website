@@ -41,10 +41,11 @@ const STORE = (function () {
     orders: "xh_orders",        // 商店：订单记录
     logs: "xh_logs",            // 管理员操作日志
     gallery: "xh_gallery",      // 公开相册：成员/家长共同上传
+    cashouts: "xh_cashouts",    // 零花钱兑换：孩子向家长申请兑换零花钱
     seedVer: "xh_seed_ver",
   };
 
-  const SEED_VERSION = 8; // 数据版本：改动种子结构时 +1，触发重新初始化（8：部署前彻底清空测试数据）
+  const SEED_VERSION = 9; // 数据版本：改动种子结构时 +1，触发重新初始化（9：新增零花钱兑换 xh_cashouts）
   const DEFAULT_PWD = "123456";
 
   /* ---------- 部门配置 ---------- */
@@ -211,6 +212,7 @@ const STORE = (function () {
     if (!server.nickname && local.nickname) server.nickname = local.nickname; // 服务端无昵称时保留本地
     if (!server.password && local.password) server.password = local.password;
     if (local.mustChange === true) server.mustChange = true;
+    if (local.role === "parent" && Number(local.cashRate) > 0) server.cashRate = local.cashRate; // 家长兑换比例本地优先
     serverUsers[si] = server;
     return serverUsers;
   }
@@ -318,7 +320,7 @@ const STORE = (function () {
         KEY.reports, KEY.cases, KEY.articles, KEY.meds, KEY.albums, KEY.notices, KEY.duty,
         KEY.wall, KEY.votes, KEY.groups,
         KEY.stars, KEY.wishes, KEY.signups, KEY.licenses, KEY.products,
-        KEY.orders, KEY.logs, KEY.gallery,
+        KEY.orders, KEY.logs, KEY.gallery, KEY.cashouts,
       ].forEach((k) => localStorage.removeItem(k));
       localStorage.setItem(KEY.seedVer, String(SEED_VERSION));
     }
@@ -392,6 +394,7 @@ const STORE = (function () {
     lsSet(KEY.licenses, []);
     lsSet(KEY.products, []);
     lsSet(KEY.orders, []);
+    lsSet(KEY.cashouts, []);
 
     // 小组：来自《7.1班分组.xlsx》核对后分组（仅第一~七组，第八组以表为准暂不导入）
     const groupData = [
@@ -537,6 +540,7 @@ const STORE = (function () {
       licenses: [],
       products: [],
       orders: [],
+      cashouts: [],
       albums: [{ id: uid("alb"), name: "班级风采掠影", author: "系统", createdTs: now(), photos, status: "published" }],
       meta: { lastUpdate: now(), lastOperator: "系统初始化" },
     };
@@ -587,9 +591,12 @@ const STORE = (function () {
       pushDocs(); // 把本会话内修改过的数据推送到服务端
       resyncDocs();
     }
+    logAction("登录", "账号 " + u.account + " 登录成功", u.name);
     return { ok: true, user: session };
   }
   function logout() {
+    const s = getSession();
+    if (s) logAction("退出登录", "账号 " + s.account + " 退出登录");
     localStorage.removeItem(KEY.session);
     setApiToken("");
     dirtyKeys.clear();
@@ -745,16 +752,17 @@ const STORE = (function () {
   }
 
   /* ---------- 管理员操作日志 ---------- */
-  function logAction(action, detail) {
-    const s = getSession();
+  // 记录任意用户操作（登录/兑换/修改等）。默认记录当前登录者；登录/注册等无会话时传入 actor 覆盖。
+  function logAction(action, detail, actorOverride) {
+    const s = actorOverride ? { name: actorOverride, role: "", rank: -1 } : getSession();
     if (!s) return;
     const logs = lsGet(KEY.logs, []);
     logs.push({
       id: uid("log"), ts: now(),
-      operator: s.name, operatorRole: s.role, operatorRank: roleRank(s.role),
+      operator: s.name, operatorRole: s.role || "", operatorRank: typeof s.rank === "number" ? s.rank : roleRank(s.role),
       action: action || "操作", detail: detail || "",
     });
-    if (logs.length > 600) logs.splice(0, logs.length - 600);
+    if (logs.length > 2000) logs.splice(0, logs.length - 2000);
     lsSet(KEY.logs, logs);
   }
   // 读取日志（最新在前）。查看权限：仅班主任/超管（最高级管理员）
@@ -945,6 +953,149 @@ const STORE = (function () {
     const s = getSession();
     if (!s) return [];
     return getRedeems().filter((r) => r.uid === s.id).slice().reverse();
+  }
+
+  /* ---------- 零花钱兑换（孩子 ↔ 家长） ---------- */
+  function getCashouts() { return lsGet(KEY.cashouts, []); }
+  function saveCashouts(list) { lsSet(KEY.cashouts, list); }
+  // 我的绑定家长（学生）：反向查找关联自己的家长
+  function myParent() {
+    const s = getSession();
+    if (!s) return null;
+    if (s.role !== "student" && s.role !== "superadmin") return null;
+    return getUsers().find((u) => u.role === "parent" && u.studentId === s.id) || null;
+  }
+  // 学生可用的兑换比例（元/分）：家长自定义优先，未设置用固定 1分=5元
+  function cashoutRate() {
+    const p = myParent();
+    if (p && Number(p.cashRate) > 0) return Math.round(Number(p.cashRate) * 100) / 100;
+    return 5;
+  }
+  // 家长：设置零花钱兑换比例
+  async function setCashRate(rate) {
+    const s = getSession();
+    if (!s) return { ok: false, msg: "未登录" };
+    if (s.role !== "parent") return { ok: false, msg: "仅家长可设置兑换比例" };
+    const r = Math.round(Number(rate) * 100) / 100;
+    if (isNaN(r) || r <= 0) return { ok: false, msg: "比例必须为正数" };
+    const users = getUsers();
+    const u = users.find((x) => x.id === s.id);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    const old = Number(u.cashRate) > 0 ? Math.round(Number(u.cashRate) * 100) / 100 : 5;
+    u.cashRate = r;
+    saveUsers(users);
+    await pushMe({ cashRate: r }); // 远程模式同步到服务端
+    logAction("修改零花钱比例", "零花钱兑换比例由 1分=" + old + "元 调整为 1分=" + r + "元");
+    return { ok: true, rate: r };
+  }
+  // 学生：申请零花钱兑换（直接向绑定家长发送申请）
+  function applyCashout(points, note) {
+    const s = getSession();
+    if (!s) return { ok: false, msg: "未登录" };
+    if (s.role !== "student" && s.role !== "superadmin") return { ok: false, msg: "只有学生可申请兑换零花钱" };
+    const parent = myParent();
+    if (!parent) return { ok: false, msg: "你尚未绑定家长：请在家长注册时选择你作为孩子" };
+    const pNum = Math.round(Number(points) * 100) / 100;
+    if (isNaN(pNum) || pNum <= 0) return { ok: false, msg: "兑换积分无效" };
+    const users = getUsers();
+    const u = users.find((x) => x.id === s.id);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    if (u.score < pNum) return { ok: false, msg: "积分不足（当前 " + u.score + " 分）" };
+    const rate = cashoutRate();
+    const money = Math.round(pNum * rate * 100) / 100;
+    const list = getCashouts();
+    list.unshift({
+      id: uid("co"), type: "apply",
+      studentId: s.id, studentName: s.name,
+      parentId: parent.id, parentName: parent.name,
+      points: pNum, money, rate,
+      status: "pending",
+      applyTs: now(), reviewTs: null, paidTs: null,
+      operator: "", reason: "", note: String(note || "").trim(),
+    });
+    saveCashouts(list);
+    logAction("申请兑换零花钱", "向家长 " + parent.name + " 申请兑换 " + pNum + " 分 = " + money + " 元");
+    return { ok: true, money, rate };
+  }
+  // 家长：查看孩子的兑换记录（含待处理申请）
+  function parentCashouts() {
+    const s = getSession();
+    if (!s || s.role !== "parent") return [];
+    const child = myChild();
+    if (!child) return [];
+    return getCashouts().filter((c) => c.parentId === s.id || c.studentId === child.id);
+  }
+  // 学生：查看自己的兑换记录
+  function myCashouts() {
+    const s = getSession();
+    if (!s) return [];
+    return getCashouts().filter((c) => c.studentId === s.id);
+  }
+  // 家长：审批申请（通过则扣除孩子积分并记为已兑换；拒绝仅标记）
+  async function reviewCashout(cashoutId, approve, reason) {
+    const s = getSession();
+    if (!s) return { ok: false, msg: "未登录" };
+    if (s.role !== "parent") return { ok: false, msg: "仅家长可审批零花钱申请" };
+    if (isRemote()) {
+      // 远程模式：扣分涉及学生积分，由服务端权威处理（家长无法整表写 users）
+      try {
+        const resp = await fetch(apiBase + "/cashout/review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiToken() },
+          body: JSON.stringify({ id: cashoutId, approve: !!approve, reason: reason || "" }),
+        });
+        const d = await resp.json();
+        if (d && d.ok) { await resyncDocs(); logAction(approve ? "批准零花钱兑换" : "拒绝零花钱兑换", d.msg || "", s.name); return { ok: true, msg: d.msg }; }
+        return d && d.msg ? { ok: false, msg: d.msg } : { ok: false, msg: "服务端处理失败" };
+      } catch (e) { return { ok: false, msg: "网络异常，请稍后重试" }; }
+    }
+    // 本地模式
+    const list = getCashouts();
+    const c = list.find((x) => x.id === cashoutId);
+    if (!c) return { ok: false, msg: "记录不存在" };
+    if (c.status !== "pending") return { ok: false, msg: "该申请已处理" };
+    if (c.parentId !== s.id) return { ok: false, msg: "这不是发送给你的申请" };
+    if (approve) {
+      const users = getUsers();
+      const stu = users.find((x) => x.id === c.studentId);
+      if (!stu) return { ok: false, msg: "孩子不存在" };
+      if (stu.score < c.points) return { ok: false, msg: "孩子积分不足（当前 " + stu.score + " 分），无法批准" };
+      stu.score = Math.round((stu.score - c.points) * 100) / 100;
+      saveUsers(users);
+      const ledger = getLedger();
+      ledger.push({ id: uid("led"), uid: stu.id, name: stu.name, delta: -c.points, after: stu.score, reason: "兑换零花钱：" + c.money + " 元", operator: s.name, operatorRole: s.role, ts: now() });
+      saveLedger(ledger);
+      c.status = "paid"; c.reviewTs = now(); c.paidTs = now(); c.operator = s.name; c.reason = reason || "家长同意";
+      logAction("批准零花钱兑换", "同意 " + stu.name + " 兑换 " + c.points + " 分 = " + c.money + " 元" + (reason ? "（" + reason + "）" : ""));
+    } else {
+      c.status = "rejected"; c.reviewTs = now(); c.operator = s.name; c.reason = reason || "家长拒绝";
+      logAction("拒绝零花钱兑换", "拒绝 " + c.studentName + " 兑换 " + c.points + " 分 = " + c.money + " 元" + (reason ? "（" + reason + "）" : ""));
+    }
+    saveCashouts(list);
+    return { ok: true };
+  }
+  // 家长：手动记录已经兑换的零花钱（不扣积分，仅登记）
+  function recordManualCashout({ money, note }) {
+    const s = getSession();
+    if (!s) return { ok: false, msg: "未登录" };
+    if (s.role !== "parent") return { ok: false, msg: "仅家长可记录零花钱" };
+    const child = myChild();
+    if (!child) return { ok: false, msg: "你尚未关联孩子" };
+    const m = Math.round(Number(money) * 100) / 100;
+    if (isNaN(m) || m <= 0) return { ok: false, msg: "金额无效" };
+    const list = getCashouts();
+    list.unshift({
+      id: uid("co"), type: "manual",
+      studentId: child.id, studentName: child.name,
+      parentId: s.id, parentName: s.name,
+      points: 0, money: m, rate: 0,
+      status: "paid",
+      applyTs: now(), reviewTs: null, paidTs: now(),
+      operator: s.name, reason: "家长手动记录", note: String(note || "").trim(),
+    });
+    saveCashouts(list);
+    logAction("手动记录零花钱", "为孩子 " + child.name + " 登记已兑换零花钱 " + m + " 元" + (note ? "（" + note + "）" : ""));
+    return { ok: true };
   }
 
   /* ---------- 昵称（需管理员审核） ---------- */
@@ -1953,6 +2104,8 @@ const STORE = (function () {
     applyLicense, reviewLicense,
     publishProduct, reviewProduct, deleteProduct, publishedProducts, myProducts, myLicense,
     buyProduct, getOrders, myOrders, mySoldOrders,
+    getCashouts, myParent, cashoutRate, setCashRate, applyCashout,
+    parentCashouts, myCashouts, reviewCashout, recordManualCashout,
     logAction, getLogs, clearLogs, roleRank,
     fmtTime, fmtMoney, now,
   };

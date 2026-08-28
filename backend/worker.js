@@ -169,6 +169,7 @@ export default {
           case path === "/meta" && method === "GET": result = await getMeta(env); break;
           case path === "/docs" && method === "PUT": result = await putDocs(request, env, auth); break;
           case path === "/docs/reset" && method === "POST": result = await docsReset(request, env, auth); break;
+          case path === "/cashout/review" && method === "POST": result = await reviewCashout(request, env, auth); break;
           default: result = json({ ok: false, msg: "接口不存在" }, 404);
         }
       }
@@ -302,6 +303,11 @@ async function updateMe(request, env, auth) {
   // 密码哈希既可能是旧无盐 SHA-256(64hex)，也可能是新加盐 `盐.摘要`(32hex.64hex)
   if (body.password !== undefined && (/^[0-9a-f]{64}$/i.test(body.password) || SALTED_RE.test(body.password))) allowed.password = body.password;
   if (body.mustChange !== undefined) allowed.mustChange = !!body.mustChange;
+  // 家长可设置零花钱兑换比例（元/分），仅允许正数
+  if (body.cashRate !== undefined) {
+    const r = Math.round(Number(body.cashRate) * 100) / 100;
+    if (isFinite(r) && r > 0) allowed.cashRate = r;
+  }
 
   const row = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
   let users = [];
@@ -524,4 +530,64 @@ async function docsReset(request, env, auth) {
   ));
   await env.DB.batch(batch);
   return { ok: true, reset: names.length };
+}
+
+// 家长审批零花钱兑换：通过则扣除孩子积分并记为已兑换（服务端权威处理）。
+// 家长无法整表写 users（会绕过计分权限），故由本接口原子处理 users / cashouts / ledger 三份文档。
+async function reviewCashout(request, env, auth) {
+  if (auth.role !== "parent") return { ok: false, msg: "仅家长可审批零花钱申请" };
+  const { id, approve, reason } = await request.json();
+  if (!id) return { ok: false, msg: "参数无效" };
+
+  const usersRow = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
+  const coRow = await env.DB.prepare("SELECT value FROM docs WHERE key = 'cashouts'").first();
+  if (!usersRow) return { ok: false, msg: "数据未初始化" };
+  let users = [], cashouts = [], ledger = [];
+  try {
+    users = JSON.parse(usersRow.value);
+    if (coRow) cashouts = JSON.parse(coRow.value);
+    const ledRow = await env.DB.prepare("SELECT value FROM docs WHERE key = 'ledger'").first();
+    if (ledRow) ledger = JSON.parse(ledRow.value);
+  } catch (e) { return { ok: false, msg: "数据损坏" }; }
+
+  const me = users.find((x) => x.id === auth.id);
+  if (!me) return { ok: false, msg: "用户不存在" };
+  const c = cashouts.find((x) => x.id === id);
+  if (!c) return { ok: false, msg: "记录不存在" };
+  if (c.status !== "pending") return { ok: false, msg: "该申请已处理" };
+  if (c.parentId !== auth.id) return { ok: false, msg: "这不是发送给你的申请" };
+  const stu = users.find((x) => x.id === c.studentId);
+  if (!stu) return { ok: false, msg: "孩子不存在" };
+
+  let msg;
+  if (approve) {
+    if (Number(stu.score) < Number(c.points)) return { ok: false, msg: "孩子积分不足，无法批准" };
+    stu.score = Math.round((Number(stu.score) - Number(c.points)) * 100) / 100;
+    c.status = "paid";
+    c.reviewTs = new Date().toISOString();
+    c.paidTs = new Date().toISOString();
+    c.operator = auth.name;
+    c.reason = reason || "家长同意";
+    ledger.push({
+      id: uid("led"), uid: stu.id, name: stu.name,
+      delta: -Number(c.points), after: stu.score,
+      reason: "兑换零花钱：" + c.money + " 元",
+      operator: auth.name, operatorRole: auth.role, ts: new Date().toISOString(),
+    });
+    msg = "同意 " + stu.name + " 兑换 " + c.points + " 分 = " + c.money + " 元";
+  } else {
+    c.status = "rejected";
+    c.reviewTs = new Date().toISOString();
+    c.operator = auth.name;
+    c.reason = reason || "家长拒绝";
+    msg = "拒绝 " + c.studentName + " 兑换 " + c.points + " 分 = " + c.money + " 元";
+  }
+
+  const batch = [
+    env.DB.prepare("INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('users', ?, datetime('now'))").bind(JSON.stringify(users)),
+    env.DB.prepare("INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('cashouts', ?, datetime('now'))").bind(JSON.stringify(cashouts)),
+    env.DB.prepare("INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('ledger', ?, datetime('now'))").bind(JSON.stringify(ledger)),
+  ];
+  await env.DB.batch(batch);
+  return { ok: true, msg };
 }

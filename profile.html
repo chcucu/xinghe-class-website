@@ -119,6 +119,35 @@
       <input type="file" id="imgInput" accept="image/*" style="display:none;">
       <div id="personalImgs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;"></div>
     </div>
+
+    <!-- 家长：零花钱管理 -->
+    <div class="panel" id="parentCashPanel" style="display:none; margin-top:22px;">
+      <h3>零花钱管理</h3>
+      <p class="hint" style="font-size:12px;color:var(--muted);margin-bottom:14px;">孩子可用操行积分向你兑换零花钱：设置比例 → 审批孩子的申请 → 记录已兑换金额。</p>
+
+      <div class="field" style="max-width:440px;">
+        <label for="coRate">零花钱兑换比例（1 积分 = 多少元）</label>
+        <div style="display:flex;gap:10px;">
+          <input type="number" class="mini" id="coRate" min="0" step="0.5" style="flex:1;">
+          <button class="btn" id="btnCoRate" style="white-space:nowrap;">保存比例</button>
+        </div>
+        <p class="hint" id="coRateHint" style="font-size:12px;color:var(--muted);margin-top:5px;">默认 1 分 = 5 元；孩子申请时按此比例换算成零花钱。</p>
+      </div>
+
+      <h3 style="margin-top:22px;">待确认申请</h3>
+      <div id="coPending"></div>
+
+      <h3 style="margin-top:24px;">手动记录已兑换零花钱</h3>
+      <p class="hint" style="font-size:12px;color:var(--muted);margin-bottom:10px;">登记线下已经给过孩子的零花钱（不扣积分），与系统记录一起留档。</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;max-width:640px;">
+        <div class="field"><label>金额（元）</label><input type="number" class="mini" id="coManualMoney" min="0" step="0.01" style="width:100%;"></div>
+        <div class="field"><label>说明（可选）</label><input type="text" class="mini" id="coManualNote" maxlength="60" style="width:100%;"></div>
+        <div class="field" style="display:flex;align-items:flex-end;"><button class="btn" id="btnCoManual">记录</button></div>
+      </div>
+
+      <h3 style="margin-top:24px;">已兑换记录</h3>
+      <div id="coHistory"></div>
+    </div>
   </main>
 
   <footer class="site-footer">
@@ -305,6 +334,85 @@
       if (r.ok) { alert("密码已更新"); document.getElementById("newPwd").value = ""; document.getElementById("newPwd2").value = ""; }
       else alert(r.msg);
     });
+
+    // 家长：零花钱管理（设比例 / 审批申请 / 手动记录）
+    const parentCashPanel = document.getElementById("parentCashPanel");
+    if (s.role === "parent") {
+      parentCashPanel.style.display = "";
+      const pself = STORE.findById(s.id);
+      const curRate = Number(pself.cashRate) > 0 ? Math.round(Number(pself.cashRate) * 100) / 100 : 5;
+      document.getElementById("coRate").value = curRate;
+      document.getElementById("coRateHint").textContent = "默认 1 分 = 5 元，当前 " + curRate + " 元/分；孩子申请时按此比例换算零花钱。";
+
+      document.getElementById("btnCoRate").addEventListener("click", async () => {
+        const r = await STORE.setCashRate(document.getElementById("coRate").value);
+        if (r.ok) { window.showToast("兑换比例已保存", "success"); }
+        else { window.showToast(r.msg, "error"); }
+      });
+
+      document.getElementById("btnCoManual").addEventListener("click", () => {
+        const r = STORE.recordManualCashout({
+          money: document.getElementById("coManualMoney").value,
+          note: document.getElementById("coManualNote").value.trim(),
+        });
+        if (r.ok) {
+          window.showToast("已记录", "success");
+          document.getElementById("coManualMoney").value = "";
+          document.getElementById("coManualNote").value = "";
+          renderCoHistory();
+        } else { window.showToast(r.msg, "error"); }
+      });
+
+      function renderCoPending() {
+        const list = STORE.parentCashouts().filter((c) => c.status === "pending");
+        const host = document.getElementById("coPending");
+        if (!list.length) { host.innerHTML = '<span class="muted-note">暂无待确认的申请。</span>'; return; }
+        host.innerHTML = list.map((c) =>
+          '<div style="border:1px solid var(--line-2);border-radius:var(--radius-md);padding:12px;margin-bottom:10px;">' +
+            '<b>' + esc(c.studentName) + '</b> 申请兑换 <b>' + c.points + ' 分</b> = <b>' + STORE.fmtMoney(c.money) + ' 元</b>' +
+            (c.note ? ' <span class="muted-note">（' + esc(c.note) + '）</span>' : "") +
+            '<div class="muted-note">' + STORE.fmtTime(c.applyTs) + ' 发起</div>' +
+            '<div style="display:flex;gap:8px;margin-top:8px;">' +
+              '<button class="btn btn-sm btn-co-ok" data-co="' + c.id + '">同意并支付</button>' +
+              '<button class="btn btn-sm btn-co-no" data-co="' + c.id + '">拒绝</button>' +
+            '</div>' +
+          '</div>'
+        ).join("");
+        host.querySelectorAll(".btn-co-ok").forEach((b) => b.addEventListener("click", async () => {
+          const r = await STORE.reviewCashout(b.dataset.co, true, "");
+          r.ok ? window.showToast("已同意，孩子积分已扣除", "success") : window.showToast(r.msg, "error");
+          renderCoPending(); renderCoHistory();
+        }));
+        host.querySelectorAll(".btn-co-no").forEach((b) => b.addEventListener("click", async () => {
+          const reason = prompt("拒绝理由（可选）", "");
+          if (reason === null) return;
+          const r = await STORE.reviewCashout(b.dataset.co, false, reason || "");
+          r.ok ? window.showToast("已拒绝", "success") : window.showToast(r.msg, "error");
+          renderCoPending(); renderCoHistory();
+        }));
+      }
+
+      function renderCoHistory() {
+        const list = STORE.parentCashouts().filter((c) => c.status !== "pending");
+        const host = document.getElementById("coHistory");
+        const stLabel = { paid: "已兑换", rejected: "已拒绝" };
+        host.innerHTML = list.length
+          ? '<div style="font-size:13px;margin-bottom:6px;">共 ' + list.length + ' 条</div>' +
+            list.slice(0, 30).map((c) =>
+              '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2);">' +
+                '<span>' + (c.type === "manual" ? "手动登记 · " : "系统记录 · ") + STORE.fmtMoney(c.money) + ' 元' +
+                  (c.type === "apply" ? ' <span class="muted-note">(' + c.points + ' 分)</span>' : "") +
+                  (c.note ? ' <span class="muted-note">' + esc(c.note) + '</span>' : "") +
+                '</span>' +
+                '<span class="muted-note" style="font-size:12.5px;">' + (stLabel[c.status] || c.status) + ' · ' + esc(STORE.fmtTime(c.paidTs || c.reviewTs || c.applyTs)) + '</span>' +
+              '</div>'
+            ).join("")
+          : '<span class="muted-note">还没有兑换记录。</span>';
+      }
+
+      renderCoPending();
+      renderCoHistory();
+    }
 
     function esc(v) { return String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
   })();
