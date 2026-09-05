@@ -99,13 +99,17 @@ async function checkPassword(plain, stored) {
 
 // ---- R2 图片：上传(base64 解为二进制) 与 读取 ----
 // 未绑定 BUCKET 时返回 R2_OFF，前端自动回退为 base64 内嵌存储，因而安全降级、不破坏现有数据。
+const MAX_IMG_BYTES = 10 * 1024 * 1024; // 解码后最大 10MB
+const MAX_IMG_B64 = Math.ceil((MAX_IMG_BYTES * 4) / 3) + 16; // base64 字符串长度上界
 async function uploadFile(request, env) {
   if (!env.BUCKET) return { ok: false, code: "R2_OFF", msg: "R2 存储未绑定" };
   const { data, ext, mime } = await request.json();
   if (!data) return { ok: false, msg: "缺少图片数据" };
+  if (typeof data !== "string" || data.length > MAX_IMG_B64) return { ok: false, msg: "图片过大，请压缩后重试" };
   let bytes;
   try { bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0)); } catch (e) { return { ok: false, msg: "图片编码错误" }; }
   if (!bytes.length) return { ok: false, msg: "图片为空" };
+  if (bytes.length > MAX_IMG_BYTES) return { ok: false, msg: "图片超过大小限制，请压缩后重试" };
   const key = "img/" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8) + "." + (ext || "jpg");
   await env.BUCKET.put(key, bytes, { httpMetadata: { contentType: mime || "image/jpeg" } });
   return { ok: true, key };
@@ -156,7 +160,7 @@ export default {
       else {
         switch (true) {
           case path === "/upload" && method === "POST": result = await uploadFile(request, env); break;
-          case path === "/me" && method === "GET": result = me(auth); break;
+          case path === "/me" && method === "GET": result = await me(request, env, auth); break;
           case path === "/me/update" && method === "POST": result = await updateMe(request, env, auth); break;
           case path === "/change-password" && method === "POST": result = await changePassword(request, env, auth); break;
           case path === "/delta" && method === "POST": result = await applyDelta(request, env, auth); break;
@@ -215,10 +219,12 @@ async function docsLogin(request, env) {
   if (u.status === "rejected") return { ok: false, msg: "该注册申请未通过审核" };
   // 旧明文 / 旧 SHA-256 升级为加盐哈希；已加盐且匹配（pwRes===true）则无需写库
   if (pwRes !== true && pwRes !== u.password) {
-    u.password = pwRes;
-    await env.DB.prepare(
-      "INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('users', ?, datetime('now'))"
-    ).bind(JSON.stringify(users)).run();
+    const hash = pwRes;
+    await casDoc(env, "users", (list) => {
+      const i = list.findIndex((x) => x.id === u.id);
+      if (i >= 0 && list[i].account === account) list[i].password = hash;
+      return list;
+    }, []);
   }
   return { ok: true, token: await signToken(u.id), user: { id: u.id, name: u.name, role: u.role, mustChange: !!u.mustChange } };
 }
@@ -253,10 +259,18 @@ async function docsRegister(request, env) {
     department: "", departmentRole: "",
     contact, bio: "", personalImages: [], badges: [], groupId: "", mustChange: false,
   };
-  users.push(newU);
-  await env.DB.prepare(
-    "INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('users', ?, datetime('now'))"
-  ).bind(JSON.stringify(users)).run();
+  // 乐观并发追加用户：账号查重 + 家长关联学生校验都在同一 CAS 内完成，避免并发注册互相覆盖
+  let missStudent = false;
+  const res = await casDoc(env, "users", (users) => {
+    if (users.find((u) => u.account === account)) return SKIP;
+    if (role === "parent") {
+      if (!body.studentId || !users.find((u) => u.id === body.studentId)) { missStudent = true; return SKIP; }
+    }
+    users.push(newU);
+    return users;
+  }, []);
+  if (!res.ok) return res;
+  if (res.skipped) return { ok: false, msg: missStudent ? "关联的学生不存在，请重试" : "该账号已被使用，请更换" };
   return { ok: true, id: newU.id };
 }
 
@@ -273,8 +287,20 @@ async function doLogin(request, env) {
   };
 }
 
-function me(auth) {
-  return { ok: true, user: { id: auth.id, name: auth.name, role: auth.role, mustChange: !!auth.must_change, score: auth.score } };
+async function me(request, env, auth) {
+  // 读 users 文档返回真实 score / mustChange / cashRate（否则这些字段恒为 undefined）
+  let score = 0, mustChange = false, cashRate = 5;
+  const row = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
+  if (row) {
+    const users = safeJson(row.value, null);
+    const u = Array.isArray(users) ? users.find((x) => x.id === auth.id) : null;
+    if (u) {
+      if (typeof u.score === "number") score = u.score;
+      mustChange = !!u.mustChange;
+      if (Number(u.cashRate) > 0) cashRate = Number(u.cashRate);
+    }
+  }
+  return { ok: true, user: { id: auth.id, name: auth.name, role: auth.role, mustChange, score, cashRate } };
 }
 
 async function changePassword(request, env, auth) {
@@ -303,21 +329,22 @@ async function updateMe(request, env, auth) {
   // 密码哈希既可能是旧无盐 SHA-256(64hex)，也可能是新加盐 `盐.摘要`(32hex.64hex)
   if (body.password !== undefined && (/^[0-9a-f]{64}$/i.test(body.password) || SALTED_RE.test(body.password))) allowed.password = body.password;
   if (body.mustChange !== undefined) allowed.mustChange = !!body.mustChange;
-  // 家长可设置零花钱兑换比例（元/分），仅允许正数
-  if (body.cashRate !== undefined) {
+  // 仅家长可设置零花钱兑换比例（元/分）
+  if (body.cashRate !== undefined && auth.role === "parent") {
     const r = Math.round(Number(body.cashRate) * 100) / 100;
     if (isFinite(r) && r > 0) allowed.cashRate = r;
   }
 
-  const row = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
-  let users = [];
-  if (row) { try { users = JSON.parse(row.value); } catch (e) { return json({ ok: false, msg: "用户数据损坏" }, 500); } }
-  const idx = users.findIndex((u) => u.id === auth.id);
-  if (idx < 0) return { ok: false, msg: "用户不存在" };
-  users[idx] = Object.assign({}, users[idx], allowed);
-  await env.DB.prepare(
-    "INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('users', ?, datetime('now'))"
-  ).bind(JSON.stringify(users)).run();
+  if (!Object.keys(allowed).length) return { ok: true };
+  // 乐观并发更新 users 文档（只改本人字段），避免并发更新互相覆盖
+  const res = await casDoc(env, "users", (users) => {
+    const i = users.findIndex((u) => u.id === auth.id);
+    if (i < 0) return SKIP;
+    users[i] = Object.assign({}, users[i], allowed);
+    return users;
+  }, []);
+  if (!res.ok) return res;
+  if (res.skipped) return { ok: false, msg: "用户不存在" };
   return { ok: true };
 }
 
@@ -392,6 +419,8 @@ async function reviewRedeem(request, env, auth) {
   const status = approve ? "approved" : "rejected";
   if (approve) {
     const u = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(rd.uid).first();
+    if (!u) return { ok: false, msg: "学生不存在" };
+    if (Number(u.score) < Number(rd.cost)) return { ok: false, msg: "学生积分不足，无法通过" };
     const after = Math.round((u.score - rd.cost) * 100) / 100;
     await env.DB.batch([
       env.DB.prepare("UPDATE users SET score = ? WHERE id = ?").bind(after, rd.uid),
@@ -415,6 +444,7 @@ async function offlineDeduct(request, env, auth) {
   if (!studentId || isNaN(c) || c <= 0) return { ok: false, msg: "参数无效" };
   const u = await env.DB.prepare("SELECT * FROM users WHERE id = ? AND role = 'student'").bind(studentId).first();
   if (!u) return { ok: false, msg: "学生不存在" };
+  if (Number(u.score) < c) return { ok: false, msg: "学生积分不足，无法扣减" };
   const after = Math.round((u.score - c) * 100) / 100;
   await env.DB.batch([
     env.DB.prepare("UPDATE users SET score = ? WHERE id = ?").bind(after, studentId),
@@ -462,6 +492,60 @@ function safeJson(v, fallback) {
 
 function isSuper(role) { return role === "admin" || role === "superadmin"; }
 
+// ---- 并发安全：docs 单文档乐观锁（CAS） ----
+// 以 updated_at(毫秒 ISO) 作为乐观锁版本：先读再改，UPDATE 时带原版本，
+// 若版本不匹配说明有并发写，读最新值重试。避免“先 SELECT 再整体 INSERT OR REPLACE”互相覆盖。
+const SKIP = Symbol("skip"); // 触发 skip / 回滚（视为无需写入）
+async function readDoc(env, key) {
+  return env.DB.prepare("SELECT value, updated_at FROM docs WHERE key = ?").bind(key).first();
+}
+async function casDoc(env, key, mutate, initVal) {
+  for (let i = 0; i < 8; i++) {
+    const row = await env.DB.prepare("SELECT value, updated_at FROM docs WHERE key = ?").bind(key).first();
+    const cur = row ? safeJson(row.value, null) : initVal;
+    if (cur === null) return { ok: false, msg: key + " 数据未初始化" };
+    const work = Array.isArray(cur) ? cur.slice() : Object.assign({}, cur);
+    const next = mutate(work);
+    if (next === SKIP) return { ok: true, skipped: true };
+    const ts = new Date().toISOString();
+    if (row) {
+      const r = await env.DB.prepare("UPDATE docs SET value = ?, updated_at = ? WHERE key = ? AND updated_at = ?")
+        .bind(JSON.stringify(next), ts, key, row.updated_at).run();
+      if (r.meta && r.meta.changes > 0) return { ok: true, value: next };
+    } else {
+      try {
+        await env.DB.prepare("INSERT INTO docs (key, value, updated_at) VALUES (?, ?, ?)")
+          .bind(key, JSON.stringify(next), ts).run();
+        return { ok: true, value: next };
+      } catch (e) { /* 唯一键冲突：并发插入，重读重试 */ }
+    }
+  }
+  return { ok: false, msg: "数据并发更新冲突，请重试" };
+}
+
+// ---- 提权防护：PUT /docs 权限由服务端权威判定 ----
+const SCORE_ROLES = ["teacher", "admin", "monitor", "superadmin"]; // 有权改积分/覆盖 users 的角色
+function canScoreRole(role) { return SCORE_ROLES.includes(role); }
+// 非超管写 users 时，用服务端既有值冻结 role/status，防止教班委自提权或代别人审批恢复
+function guardUserRoles(incoming, existing) {
+  const map = {};
+  (Array.isArray(existing) ? existing : []).forEach((u) => { if (u && u.id) map[u.id] = u; });
+  return (Array.isArray(incoming) ? incoming : []).map((u) => {
+    const old = u && u.id ? map[u.id] : null;
+    if (!old) return u;
+    const out = Object.assign({}, u);
+    out.role = old.role || u.role;
+    out.status = old.status || u.status;
+    return out;
+  });
+}
+
+// 重置/引导密钥由环境变量决定，避免写死在源码里被利用
+function seedSecret(env) {
+  const s = env && env.AUTH_SECRET;
+  return typeof s === "string" && s.length ? s : null;
+}
+
 async function getDocs(request, env) {
   const url = new URL(request.url);
   const keys = (url.searchParams.get("keys") || "").split(",").filter(Boolean);
@@ -476,23 +560,38 @@ async function getDocs(request, env) {
 }
 
 async function putDocs(request, env, auth) {
-  // 覆盖权限：body.perms 里 key -> 'any'（登录即可写）| 'super'（仅管理）
+  // 覆盖权限由服务端权威判定，绝不信任客户端传来的 body.perms（防任意登录用户整表写 users 提权）。
+  // 规则：
+  //   users —— 仅 教师/班委/管理 可覆盖（且非超管写入时冻结 role/status，防止自提权）；
+  //   其余文档 —— 登录即可写。
   const body = await request.json();
   const docs = body.docs || {};
-  const perms = body.perms || {};
   const names = Object.keys(docs);
   if (!names.length) return { ok: false, msg: "没有要保存的内容" };
-  const canSuper = isSuper(auth.role);
+  const canScore = canScoreRole(auth.role);
+
+  // 先读一次现有 users（非超管写 users 时用于冻结 role/status；超管无需读取）
+  let existingUsers = null;
+  if (docs.users !== undefined && auth.role !== "superadmin") {
+    const row = await readDoc(env, "users");
+    existingUsers = row ? safeJson(row.value, null) : null;
+  }
+  // 服务端权威判定：这份文档该用户能否覆盖
+  const allowed = names.filter((k) => {
+    if (k === "users") return canScore;
+    return true; // 其余文档登录即可写
+  });
+  if (!allowed.length) return { ok: false, msg: "没有权限写入这些内容" };
+
   const batch = [];
-  names.forEach((k) => {
-    const p = perms[k] === "super" ? "super" : "any";
-    if (p === "super" && !canSuper) return;
+  allowed.forEach((k) => {
+    let val = docs[k];
+    if (k === "users" && existingUsers !== null) val = guardUserRoles(val, existingUsers); // 冻结 role/status
     batch.push(
       env.DB.prepare("INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES (?, ?, datetime('now'))")
-        .bind(k, JSON.stringify(docs[k]))
+        .bind(k, JSON.stringify(val))
     );
   });
-  if (!batch.length) return { ok: false, msg: "没有权限写入这些内容" };
   await env.DB.batch(batch);
   return { ok: true, saved: batch.length };
 }
@@ -518,8 +617,12 @@ async function docsBootstrap(request, env) {
 
 async function docsReset(request, env, auth) {
   if (!isSuper(auth.role)) return { ok: false, msg: "无权限" };
+  // 重置是破坏性操作：除超管身份外，还必须持有服务端安全密钥（AUTH_SECRET），
+  // 且密钥以环境变量为准，不写死在源码里，杜绝“源码读到的种子”被利用来清库。
+  const secret = seedSecret(env);
+  if (!secret) return json({ ok: false, msg: "后端未配置安全密钥，已禁止重置" }, 403);
   const body = await request.json();
-  if (body.seed !== "xinghe-2026-seed") return { ok: false, msg: "校验失败" };
+  if (body.seed !== secret) return { ok: false, msg: "校验失败" };
   const docs = body.docs || {};
   const names = Object.keys(docs);
   const batch = [
@@ -533,61 +636,69 @@ async function docsReset(request, env, auth) {
 }
 
 // 家长审批零花钱兑换：通过则扣除孩子积分并记为已兑换（服务端权威处理）。
-// 家长无法整表写 users（会绕过计分权限），故由本接口原子处理 users / cashouts / ledger 三份文档。
+// 家长无法整表写 users（会绕过计分权限），故由本接口处理 users / cashouts / ledger 三份文档。
+// 全部走 casDoc 乐观锁，避免并发审批时“先读旧值再整体覆盖”造成积分/状态丢失或重复扣分。
 async function reviewCashout(request, env, auth) {
   if (auth.role !== "parent") return { ok: false, msg: "仅家长可审批零花钱申请" };
   const { id, approve, reason } = await request.json();
   if (!id) return { ok: false, msg: "参数无效" };
 
-  const usersRow = await env.DB.prepare("SELECT value FROM docs WHERE key = 'users'").first();
-  const coRow = await env.DB.prepare("SELECT value FROM docs WHERE key = 'cashouts'").first();
-  if (!usersRow) return { ok: false, msg: "数据未初始化" };
-  let users = [], cashouts = [], ledger = [];
-  try {
-    users = JSON.parse(usersRow.value);
-    if (coRow) cashouts = JSON.parse(coRow.value);
-    const ledRow = await env.DB.prepare("SELECT value FROM docs WHERE key = 'ledger'").first();
-    if (ledRow) ledger = JSON.parse(ledRow.value);
-  } catch (e) { return { ok: false, msg: "数据损坏" }; }
+  // 1) 翻转 cashouts 状态（幂等：已处理/非本人申请则跳过）
+  const coRes = await casDoc(env, "cashouts", (list) => {
+    const i = list.findIndex((x) => x.id === id);
+    if (i < 0) return SKIP;
+    if (list[i].parentId !== auth.id) return SKIP;
+    if (list[i].status !== "pending") return SKIP;
+    const n = Object.assign({}, list[i]);
+    n.reviewTs = new Date().toISOString();
+    n.operator = auth.name;
+    if (approve) { n.status = "paid"; n.paidTs = new Date().toISOString(); n.reason = reason || "家长同意"; }
+    else { n.status = "rejected"; n.reason = reason || "家长拒绝"; }
+    list[i] = n;
+    return list;
+  }, []);
+  if (!coRes.ok) return coRes;
+  if (coRes.skipped) return { ok: false, msg: "该申请已处理或不存在" };
+  const c = coRes.value.find((x) => x.id === id);
 
-  const me = users.find((x) => x.id === auth.id);
-  if (!me) return { ok: false, msg: "用户不存在" };
-  const c = cashouts.find((x) => x.id === id);
-  if (!c) return { ok: false, msg: "记录不存在" };
-  if (c.status !== "pending") return { ok: false, msg: "该申请已处理" };
-  if (c.parentId !== auth.id) return { ok: false, msg: "这不是发送给你的申请" };
-  const stu = users.find((x) => x.id === c.studentId);
-  if (!stu) return { ok: false, msg: "孩子不存在" };
+  // 拒绝无需扣分，直接返回
+  if (!approve) {
+    return { ok: true, msg: "拒绝 " + (c.studentName || "") + " 兑换 " + c.points + " 分 = " + c.money + " 元" };
+  }
 
-  let msg;
-  if (approve) {
-    if (Number(stu.score) < Number(c.points)) return { ok: false, msg: "孩子积分不足，无法批准" };
-    stu.score = Math.round((Number(stu.score) - Number(c.points)) * 100) / 100;
-    c.status = "paid";
-    c.reviewTs = new Date().toISOString();
-    c.paidTs = new Date().toISOString();
-    c.operator = auth.name;
-    c.reason = reason || "家长同意";
-    ledger.push({
-      id: uid("led"), uid: stu.id, name: stu.name,
-      delta: -Number(c.points), after: stu.score,
+  // 2) 同意：扣除孩子积分（users 乐观并发，防止并发审批重复扣分）
+  const pts = Number(c.points) || 0;
+  const uRes = await casDoc(env, "users", (users) => {
+    const i = users.findIndex((x) => x.id === c.studentId);
+    if (i < 0 || Number(users[i].score) < pts) return SKIP;
+    users[i].score = Math.round((Number(users[i].score) - pts) * 100) / 100;
+    return users;
+  }, []);
+  if (!uRes.ok) return uRes;
+  if (uRes.skipped) {
+    // 扣分未完成（学生不存在/积分不足），回滚 cashouts 状态为待确认
+    await casDoc(env, "cashouts", (list) => {
+      const i = list.findIndex((x) => x.id === id);
+      if (i >= 0 && list[i].status === "paid") {
+        list[i].status = "pending"; list[i].reason = ""; list[i].operator = "";
+        list[i].reviewTs = null; list[i].paidTs = null;
+      }
+      return list;
+    }, []);
+    return { ok: false, msg: "孩子积分不足，无法批准" };
+  }
+
+  // 3) 记流水（ledger 文档追加）
+  const afterScore = uRes.value.find((x) => x.id === c.studentId);
+  await casDoc(env, "ledger", (list) => {
+    list.push({
+      id: uid("led"), uid: c.studentId, name: c.studentName,
+      delta: -pts, after: afterScore ? Number(afterScore.score) : 0,
       reason: "兑换零花钱：" + c.money + " 元",
       operator: auth.name, operatorRole: auth.role, ts: new Date().toISOString(),
     });
-    msg = "同意 " + stu.name + " 兑换 " + c.points + " 分 = " + c.money + " 元";
-  } else {
-    c.status = "rejected";
-    c.reviewTs = new Date().toISOString();
-    c.operator = auth.name;
-    c.reason = reason || "家长拒绝";
-    msg = "拒绝 " + c.studentName + " 兑换 " + c.points + " 分 = " + c.money + " 元";
-  }
+    return list;
+  }, []);
 
-  const batch = [
-    env.DB.prepare("INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('users', ?, datetime('now'))").bind(JSON.stringify(users)),
-    env.DB.prepare("INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('cashouts', ?, datetime('now'))").bind(JSON.stringify(cashouts)),
-    env.DB.prepare("INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES ('ledger', ?, datetime('now'))").bind(JSON.stringify(ledger)),
-  ];
-  await env.DB.batch(batch);
-  return { ok: true, msg };
+  return { ok: true, msg: "同意 " + (c.studentName || "") + " 兑换 " + c.points + " 分 = " + c.money + " 元" };
 }
