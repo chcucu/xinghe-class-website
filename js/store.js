@@ -26,9 +26,10 @@ const STORE = (function () {
     reports: "xh_reports",      // 纪检：匿名举报
     cases: "xh_cases",          // 纪检：案件公示
     articles: "xh_articles",    // 编辑部：新闻/小报
-    meds: "xh_meds",            // 医疗部：公告
+    meds: "xh_meds",            // 后勤部：公告（医务/生活/劳动）
     albums: "xh_albums",        // 宣传部：相册
     notices: "xh_notices",      // 通知公告
+    deptNotices: "xh_dept_notices", // 部门弹窗公告（登录后弹窗展示）
     duty: "xh_duty",            // 值日表
     wall: "xh_wall",            // 悄悄话墙
     votes: "xh_votes",          // 投票/问卷
@@ -48,17 +49,220 @@ const STORE = (function () {
   const SEED_VERSION = 9; // 数据版本：改动种子结构时 +1，触发重新初始化（9：新增零花钱兑换 xh_cashouts）
   const DEFAULT_PWD = "123456";
 
-  /* ---------- 部门配置 ---------- */
+  /* ---------- 部门配置（与《星河班班委职责表》一致） ---------- */
   const DEPTS = {
-    xuanchuan: { name: "宣传部", title: "相册管理", desc: "班级照片采集与发布", page: "department.html?dept=xuanchuan" },
-    jiwei:     { name: "纪检部", title: "纪检公示", desc: "近期案件处理结果公示", page: "department.html?dept=jiwei" },
-    bianji:    { name: "编辑部", title: "新闻 · 星河小报", desc: "班级报纸发布与新闻", page: "department.html?dept=bianji" },
-    yiliao:    { name: "医疗部", title: "医疗公告", desc: "健康与医疗通知发布", page: "department.html?dept=yiliao" },
-    shichang:  { name: "市场监督管理局", title: "市场监督管理局", desc: "营业执照审批 · 商店监管", page: "shop.html" },
+    xingzheng:   { name: "行政部", title: "行政事务", desc: "班级外交 · 考勤 · 班委协调", page: "department.html?dept=xingzheng" },
+    houqin:      { name: "后勤部", title: "后勤公告", desc: "劳动 · 生活 · 医务 · 安全", page: "department.html?dept=houqin" },
+    xuexi:       { name: "学习部", title: "学习动态", desc: "作业收交 · 背书检查 · 学习活动", page: "department.html?dept=xuexi" },
+    wenti:       { name: "文体部", title: "文体活动", desc: "体育赛事 · 文艺展演", page: "department.html?dept=wenti" },
+    jiwei:       { name: "纪检部", title: "纪检公示", desc: "纪律监督 · 案件公示", page: "department.html?dept=jiwei" },
+    xuanchuan:   { name: "宣传部", title: "宣传相册", desc: "照片采集 · 版报 · 会场布置", page: "department.html?dept=xuanchuan" },
+    bianji:      { name: "编辑部", title: "新闻 · 星河小报", desc: "班级报纸发布与新闻", page: "department.html?dept=bianji" },
+    xinxianquan: { name: "信息安全部", title: "信息安全", desc: "班级网站管理 · 信息保密", page: "department.html?dept=xinxianquan" },
+    shichang:    { name: "市场监督管理局", title: "市场监督管理局", desc: "营业执照审批 · 商店监管", page: "shop.html" },
+    huodong:     { name: "活动策划部", title: "活动方案", desc: "活动方案设计 · 史册记录", page: "department.html?dept=huodong" },
   };
 
-  function isDeptMember(u, dept) { return !!(u && u.department === dept && (u.departmentRole === "member" || u.departmentRole === "minister")); }
-  function isMinister(u, dept) { return !!(u && u.department === dept && u.departmentRole === "minister"); }
+  /* ---------- 班委职责表（与《星河班班委职责表》一致） ----------
+     图片按姓名自动关联：image/<姓名>.jpg，换图即生效；无图时显示姓名首字占位。 */
+  const COMMITTEE = [
+    { dept: "xingzheng", name: "行政部", brief: "代表班级形象，组织班委会，协调监督各班委工作。", members: [
+      { role: "行政部长（班长）", name: "关茗心", duty: "负责外交，喊上下课口号，组织班委会，协调、安排、监督其他班委工作；搜集上报表册、资料、考勤；处理突发、紧急事务；组织优秀评选" },
+      { role: "副班长 · 星河银行行长", name: "何汶锦", duty: "管理班级星河银行，统计星河币；负责「富豪榜」统计" },
+      { role: "一组小组长", name: "杨骐羽", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "二组小组长", name: "李雨婷", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "三组小组长", name: "杨萌", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "四组小组长", name: "吴明慧", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "五组小组长", name: "郑雨嘉", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "六组小组长", name: "柴丽欣", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "七组小组长", name: "沈杜晨希", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "八组小组长", name: "康寇佳琦", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+    ] },
+    { dept: "houqin", name: "后勤部", brief: "劳动、生活、医务与安全，保障班级日常运转。", members: [
+      { role: "劳动部部长（劳动委员）", name: "邹奕宁", duty: "组织班级劳动活动；安排班级轮值表及分工，监督每日劳动并检查；评选劳动之星" },
+      { role: "生活委员", name: "杨雯瑶", duty: "管理班级饮用水、水票及饮水机；每日中餐、午点的发放和管理；领取劳动工具" },
+      { role: "后勤委员", name: "付楚珵", duty: "监督桌椅整洁、地面卫生、劳动工具的领取和摆放；水槽卫生监督管理" },
+      { role: "医务委员", name: "宋彦霖", duty: "负责医药箱的管理" },
+      { role: "安全委员", name: "吴优", duty: "负责班级日常安全监督" },
+    ] },
+    { dept: "xuexi", name: "学习部", brief: "组织学习活动，监督作业收交与背书检查。", members: [
+      { role: "学习部部长（学习委员）", name: "刘慕辰", duty: "组织班级学习活动；填报《作业记录手册》；作业布置及通知，监督收交并安排每日晨读；评选每月学习之星" },
+      { role: "语文课代表", name: "郑翀", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "语文课代表", name: "闫熙曼", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "数学课代表", name: "谢沂萱", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "数学课代表", name: "单立安", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "英语课代表", name: "汤程杰", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "英语课代表", name: "韦尚轩", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "英语课代表", name: "杨天泽", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "历史课代表", name: "赵津仪", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "道法课代表", name: "梁书宁", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "生物课代表", name: "王煜滢", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "地理课代表", name: "李欣桐", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "物理课代表", name: "马睿瞳", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+      { role: "物理课代表", name: "何兆轩", duty: "每日作业收交并统计；背书、默写、听写、改错的监督检查；学科学习活动开展" },
+    ] },
+    { dept: "wenti", name: "文体部", brief: "组织体育活动与文艺展演，活跃班级氛围。", members: [
+      { role: "文体部部长（体育委员）", name: "李文芳", duty: "组织大课间活动、运动会运动员筛选及体育课集队整队；体育活动纪律安全监督；评选体育之星" },
+      { role: "文艺委员", name: "徐开萍", duty: "组织班级文艺活动与文化展演排练；国歌、校歌、班歌等练唱排舞；兼任美术、音乐课代表" },
+    ] },
+    { dept: "jiwei", name: "纪检部", brief: "监督班级纪律与作业文明，调查取证违规违纪。", members: [
+      { role: "纪检部部长（纪律委员）", name: "李静苒", duty: "配合班长管理班级纪律，监督自习课纪律；监督作业文明，杜绝抄写；违规违纪调查取证、处理上报" },
+      { role: "纪检委员", name: "王翼航", duty: "配合纪检部工作，监督班级纪律与作业文明" },
+      { role: "纪检委员", name: "周廷翰", duty: "配合纪检部工作，监督班级纪律与作业文明" },
+    ] },
+    { dept: "xuanchuan", name: "宣传部", brief: "搜集班级活动照片，负责版报与宣传布置。", members: [
+      { role: "宣传部部长", name: "徐立凡", duty: "为班级活动搜集照片，制作班级DVD、PPT；版报制作、宣传栏美化粘贴；黑板布置、会场布置与气氛营造" },
+      { role: "宣传委员", name: "焦柔溪", duty: "配合宣传部分工，负责宣传布置与照片搜集" },
+      { role: "宣传委员", name: "吴亦翾", duty: "配合宣传部分工，负责宣传布置与照片搜集" },
+    ] },
+    { dept: "bianji", name: "编辑部", brief: "统筹班级小报的设计与制作。", members: [
+      { role: "编辑部部长", name: "李张涵", duty: "统筹班级小报的设计、制作等" },
+      { role: "文字编辑", name: "闫熙曼", duty: "负责选稿、审稿工作" },
+      { role: "文字编辑", name: "许文昊", duty: "负责选稿、审稿工作" },
+      { role: "信息编辑", name: "洪晨竣", duty: "负责电脑排版设计工作" },
+      { role: "信息编辑", name: "陈劲豪", duty: "负责电脑排版设计工作" },
+    ] },
+    { dept: "xinxianquan", name: "信息安全部", brief: "负责班级网站管理与信息保密。", members: [
+      { role: "信息安全部部长", name: "陈劲豪", duty: "负责班级网站的管理、制作与信息安全管理" },
+      { role: "信息安全管理员", name: "陈天和", duty: "负责教室电脑的开关管理；网络安全监督；班级日常安全监督管理（安全信息上报、安全手册记录）" },
+      { role: "信息保密员", name: "赵翌旭", duty: "负责每次考前考场布置；考试期间的文明纪律监督" },
+      { role: "信息保密员", name: "杨馨", duty: "负责每次考前考场布置；考试期间的文明纪律监督" },
+      { role: "信息保密员", name: "李俊娴", duty: "负责每次考前考场布置；考试期间的文明纪律监督" },
+      { role: "信息保密员", name: "张芝清", duty: "负责每次考前考场布置；考试期间的文明纪律监督" },
+    ] },
+    { dept: "shichang", name: "市场监督管理局", brief: "监督零食入校与班级小超市经营。", members: [
+      { role: "市场监督管理局局长", name: "孙明远", duty: "监督学生违规带零食进校；班级小超市的定品、定价监督管理" },
+      { role: "市场监督管理员", name: "赵晨雅", duty: "制作经营许可证；中餐辅食的质量检查（有效期、包装等）" },
+    ] },
+    { dept: "huodong", name: "活动策划部", brief: "设计班级活动方案，保管班级史册。", members: [
+      { role: "活动策划部部长", name: "闫熙曼", duty: "负责每次班级活动的活动方案设计" },
+      { role: "活动策划部副部长", name: "云健凌", duty: "负责每次班级活动的活动方案设计" },
+      { role: "活动策划部员", name: "陈天和", duty: "负责每次班级活动的活动方案设计" },
+      { role: "班级史官", name: "杨萌", duty: "负责班级史册的保管和撰写" },
+    ] },
+  ];
+
+  /* ---------- 上一届班委（历史成员，展示于班级介绍页） ---------- */
+  const PREV_COMMITTEE = [
+    { role: "班长", name: "杨天泽", meta: "班级银行管理" },
+    { role: "班长", name: "康寇佳琦", meta: "班级日常事务" },
+    { role: "语文课代表", name: "闫熙曼", meta: "语文学习与作业收发", with: ["郑翀"] },
+    { role: "数学课代表", name: "谢沂萱", meta: "数学学习与作业收发", with: ["许文昊"] },
+    { role: "英语课代表", name: "关茗心", meta: "英语学习与作业收发", with: ["汤程杰", "韦尚轩"] },
+    { role: "地理课代表", name: "宋晟睿", meta: "地理学习与作业收发" },
+    { role: "历史课代表", name: "赵津仪", meta: "历史学习与作业收发", with: ["沈杜晨希"] },
+    { role: "生物课代表", name: "云健凌", meta: "生物学习与作业收发" },
+    { role: "体育课代表", name: "李文芳", meta: "体育课与队列组织" },
+    { role: "道法课代表", name: "郑雨嘉", meta: "道德与法治课程" },
+    { role: "信息课代表", name: "陈劲豪", meta: "信息技术课程", with: ["洪晨竣"] },
+  ];
+
+  /* ---------- 按班委表分配职务 ---------- */
+  // 判定是否为可审批的"部长"（副部长/副职不拥有审批权）
+  function isMinisterRole(roleName) {
+    const r = String(roleName || "");
+    if (!r) return false;
+    if (/副/.test(r)) return false;            // 副部长/副局长等无审批权
+    return /部长|局长|行长/.test(r);
+  }
+  // 按班委表为单个姓名计算全部职务
+  function buildPostsFor(name) {
+    const posts = [];
+    COMMITTEE.forEach((d) => {
+      d.members.forEach((m) => {
+        if (m.name !== name) return;
+        posts.push({ dept: d.dept, role: isMinisterRole(m.role) ? "minister" : "member" });
+      });
+    });
+    return posts;
+  }
+  // 为全体用户按班委表分配：主部门 = 第一个匹配部门，posts 全量
+  function assignCommittee(users) {
+    const byName = {};
+    users.forEach((u) => { (byName[u.name] = byName[u.name] || []).push(u); });
+    COMMITTEE.forEach((d) => {
+      d.members.forEach((m) => {
+        (byName[m.name] || []).forEach((u) => {
+          const role = isMinisterRole(m.role) ? "minister" : "member";
+          u.posts = u.posts || [];
+          if (!u.posts.some((p) => p.dept === d.dept)) u.posts.push({ dept: d.dept, role });
+          if (!u.department) { u.department = d.dept; u.departmentRole = role; }
+        });
+      });
+    });
+    users.forEach((u) => { if (!Array.isArray(u.posts)) u.posts = []; });
+  }
+
+  // 已有用户增量补齐 posts（幂等）：不覆盖人工分配，仅补缺失；保留既有主部门兜底条目
+  function backfillUserPosts() {
+    let users;
+    try { users = getUsers(); } catch (e) { return false; }
+    if (!Array.isArray(users) || !users.length) return false;
+    let changed = false;
+    users.forEach((u) => {
+      if (!u) return;
+      if (Array.isArray(u.posts)) return; // 已迁移
+      const posts = buildPostsFor(u.name || "");
+      if (u.department && !posts.some((p) => p.dept === u.department)) {
+        posts.unshift({ dept: u.department, role: u.departmentRole === "minister" ? "minister" : "member" });
+      }
+      u.posts = posts;
+      if (!u.department && posts.length) { u.department = posts[0].dept; u.departmentRole = posts[0].role; }
+      changed = true;
+    });
+    if (changed) {
+      try { saveUsers(users); } catch (e) { return false; }
+      logAction("迁移多职务", "为已有用户按班委表补齐部门职务");
+    }
+    return changed;
+  }
+
+  // 自动按《班委职责表》同步学生职务标签（幂等）：
+  // 每次站点初始化时自动运行，班委表里出现的职务自动补齐/纠正，无需管理员手动操作；
+  // 用户手工添加的非班委部门职务保留不动，仅当班委表覆盖到同一部门时以班委表职务为准。
+  function autoApplyCommittee() {
+    let users;
+    try { users = getUsers(); } catch (e) { return false; }
+    if (!Array.isArray(users) || !users.length) return false;
+    const byName = {};
+    users.forEach((u) => { (byName[u.name] = byName[u.name] || []).push(u); });
+    let changed = false;
+    COMMITTEE.forEach((d) => {
+      d.members.forEach((m) => {
+        (byName[m.name] || []).forEach((u) => {
+          if (u.role !== "student" && u.role !== "superadmin") return; // 只处理学生
+          const role = isMinisterRole(m.role) ? "minister" : "member";
+          u.posts = Array.isArray(u.posts) ? u.posts : [];
+          const i = u.posts.findIndex((p) => p.dept === d.dept);
+          if (i >= 0) {
+            if (u.posts[i].role !== role) { u.posts[i].role = role; changed = true; }
+          } else {
+            u.posts.push({ dept: d.dept, role });
+            changed = true;
+          }
+          if (!u.department) { u.department = d.dept; u.departmentRole = role; changed = true; }
+        });
+      });
+    });
+    if (changed) {
+      try { saveUsers(users); } catch (e) { return false; }
+      logAction("自动同步班委标签", "按《班委职责表》自动补齐/纠正学生部门职务");
+    }
+    return changed;
+  }
+
+  // 某用户在指定部门的职务（多职务 posts 优先，回退旧单职务字段）
+  function deptRoleOf(u, dept) {
+    if (!u) return "";
+    if (Array.isArray(u.posts)) {
+      const p = u.posts.find((x) => x && x.dept === dept);
+      if (p) return p.role === "minister" ? "minister" : "member";
+    }
+    if (u.department === dept && (u.departmentRole === "member" || u.departmentRole === "minister")) return u.departmentRole;
+    return "";
+  }
+  function isDeptMember(u, dept) { return deptRoleOf(u, dept) !== ""; }
+  function isMinister(u, dept) { return deptRoleOf(u, dept) === "minister"; }
 
   // 部门成员可编辑（草稿）：班主任/超管 或 本部门成员/部长
   function canEditDept(dept) {
@@ -212,6 +416,7 @@ const STORE = (function () {
     if (!server.nickname && local.nickname) server.nickname = local.nickname; // 服务端无昵称时保留本地
     if (!server.password && local.password) server.password = local.password;
     if (local.mustChange === true) server.mustChange = true;
+    if (Array.isArray(local.posts) && local.posts.length) server.posts = local.posts; // 本地多职务优先，防止 resync 冲掉
     if (local.role === "parent" && Number(local.cashRate) > 0) server.cashRate = local.cashRate; // 家长兑换比例本地优先
     serverUsers[si] = server;
     return serverUsers;
@@ -311,6 +516,8 @@ const STORE = (function () {
     if (isRemote()) {
       await remoteBootstrap();
       await resyncDocs();
+      // 服务端旧数据可能缺多职务字段：合并后自动按班委表补齐职务标签（幂等，有变化才推回服务端）
+      autoApplyCommittee();
       return;
     }
     // 版本迁移：种子结构变化时，清除旧数据重新初始化
@@ -324,7 +531,8 @@ const STORE = (function () {
       ].forEach((k) => localStorage.removeItem(k));
       localStorage.setItem(KEY.seedVer, String(SEED_VERSION));
     }
-    if (lsGet(KEY.users, null)) return;
+    // 已有数据：仅做多职务增量迁移（幂等），不重新初始化
+    if (lsGet(KEY.users, null)) { backfillUserPosts(); return; }
     const [students, teachers] = await Promise.all([
       fetch("data/students.json").then((r) => r.json()),
       fetch("data/teachers.json").then((r) => r.json()),
@@ -345,6 +553,7 @@ const STORE = (function () {
         avatar: "",
         department: "",
         departmentRole: "",
+        posts: [],
         contact: { qq: "", email: "", phone: "" },
         bio: "",
         personalImages: [],
@@ -367,6 +576,7 @@ const STORE = (function () {
         avatar: "",
         department: "",
         departmentRole: "",
+        posts: [],
         contact: { qq: "", email: "", phone: "" },
         bio: "",
         personalImages: [],
@@ -375,6 +585,7 @@ const STORE = (function () {
         mustChange: true,
       });
     });
+    assignCommittee(users);
     lsSet(KEY.users, users);
     lsSet(KEY.ledger, []);
     lsSet(KEY.redeems, []);
@@ -477,7 +688,7 @@ const STORE = (function () {
       users.push({
         id: "stu-" + i, name: s.name, account: s.account, password: defHash,
         role: s.superadmin ? "superadmin" : "student", score: s.score,
-        nickname: "", nickPending: "", avatar: "", department: "", departmentRole: "",
+        nickname: "", nickPending: "", avatar: "", department: "", departmentRole: "", posts: [],
         contact: { qq: "", email: "", phone: "" }, bio: "", personalImages: [], badges: [],
         groupId: "", mustChange: true,
       });
@@ -486,11 +697,12 @@ const STORE = (function () {
       users.push({
         id: "tea-" + i, name: t.name, account: t.account, password: defHash,
         role: t.head ? "admin" : "teacher", subject: t.subject, score: 0,
-        nickname: "", nickPending: "", avatar: "", department: "", departmentRole: "",
+        nickname: "", nickPending: "", avatar: "", department: "", departmentRole: "", posts: [],
         contact: { qq: "", email: "", phone: "" }, bio: "", personalImages: [], badges: [],
         groupId: "", mustChange: true,
       });
     });
+    assignCommittee(users);
     const photos = [];
     for (let i = 1; i <= 107; i++) {
       const n = String(i).padStart(2, "0");
@@ -630,7 +842,7 @@ const STORE = (function () {
       registerTs: now(),
       score: 0,
       nickname: "", nickPending: "", avatar: "",
-      department: "", departmentRole: "",
+      department: "", departmentRole: "", posts: [],
       contact: { qq: "", email: "", phone: "" },
       bio: "", personalImages: [], badges: [], groupId: "",
       mustChange: false,
@@ -1171,7 +1383,7 @@ const STORE = (function () {
     logAction("调整角色", u.name + " → " + newRole);
     return { ok: true };
   }
-  // 班主任/超管：分配部门与部门职务
+  // 班主任/超管：设主部门（同步 upsert 进 posts 多职务）
   function adminUpdateDept(uid, department, departmentRole) {
     const op = getSession();
     if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
@@ -1181,8 +1393,76 @@ const STORE = (function () {
     const depts = Object.keys(DEPTS);
     u.department = depts.includes(department) ? department : "";
     u.departmentRole = u.department ? (["member", "minister"].includes(departmentRole) ? departmentRole : "member") : "";
+    u.posts = Array.isArray(u.posts) ? u.posts : [];
+    if (u.department) {
+      const post = { dept: u.department, role: u.departmentRole };
+      const i = u.posts.findIndex((p) => p.dept === u.department);
+      if (i >= 0) u.posts[i] = post; else u.posts.push(post);
+    } // 清空主部门时保留其它 posts（用户仍是多部门成员）
     saveUsers(users);
-    logAction("分配部门", u.name + " → " + (u.department ? (DEPTS[u.department]?.name || u.department) + "·" + (u.departmentRole === "minister" ? "部长" : "成员") : "无部门"));
+    logAction("分配部门", u.name + " → " + (u.department ? (DEPTS[u.department]?.name || u.department) + "·" + (u.departmentRole === "minister" ? "部长" : "成员") : "无主部门"));
+    return { ok: true };
+  }
+  // 班主任/超管：给用户追加一个部门职务（多职务支持）
+  function adminAddPost(uid, dept, role) {
+    const op = getSession();
+    if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    if (!DEPTS[dept]) return { ok: false, msg: "部门不存在" };
+    const r = ["member", "minister"].includes(role) ? role : "member";
+    const users = getUsers();
+    const u = users.find((x) => x.id === uid);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    u.posts = Array.isArray(u.posts) ? u.posts : [];
+    const i = u.posts.findIndex((p) => p.dept === dept);
+    if (i >= 0) u.posts[i] = { dept, role: r }; else u.posts.push({ dept, role: r });
+    if (!u.department) { u.department = dept; u.departmentRole = r; } // 无主部门时首个职务兼作主部门
+    saveUsers(users);
+    logAction("添加职务", u.name + " → " + DEPTS[dept].name + "·" + (r === "minister" ? "部长" : "成员"));
+    return { ok: true };
+  }
+  // 班主任/超管：移除用户的某个部门职务
+  function adminRemovePost(uid, dept) {
+    const op = getSession();
+    if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    const users = getUsers();
+    const u = users.find((x) => x.id === uid);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    u.posts = (Array.isArray(u.posts) ? u.posts : []).filter((p) => p.dept !== dept);
+    if (u.department === dept) { u.department = ""; u.departmentRole = ""; }
+    if (!u.department && u.posts.length) { u.department = u.posts[0].dept; u.departmentRole = u.posts[0].role; }
+    saveUsers(users);
+    logAction("移除职务", u.name + " ← " + (DEPTS[dept]?.name || dept));
+    return { ok: true };
+  }
+  // 班主任/超管：整体替换某用户的多职务（posts 空则清空）
+  function adminSetPosts(uid, posts) {
+    const op = getSession();
+    if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    if (!Array.isArray(posts)) return { ok: false, msg: "职务格式无效" };
+    const clean = [];
+    posts.forEach((p) => { if (p && DEPTS[p.dept] && ["member", "minister"].includes(p.role)) clean.push({ dept: p.dept, role: p.role }); });
+    const users = getUsers();
+    const u = users.find((x) => x.id === uid);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    u.posts = clean;
+    if (clean.length) {
+      if (!u.department || !clean.some((p) => p.dept === u.department)) { u.department = clean[0].dept; u.departmentRole = clean[0].role; }
+    } else { u.department = ""; u.departmentRole = ""; }
+    saveUsers(users);
+    logAction("设置多职务", u.name + " → " + (clean.map((p) => (DEPTS[p.dept]?.name || p.dept) + "·" + (p.role === "minister" ? "部长" : "成员")).join("、") || "无"));
+    return { ok: true };
+  }
+  // 班主任/超管：一键按《班委职责表》重分配全部学生职务
+  function adminApplyCommittee() {
+    const op = getSession();
+    if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    const users = getUsers();
+    users.forEach((u) => {
+      if (u.role === "student" || u.role === "superadmin") { delete u.department; delete u.departmentRole; u.posts = []; }
+    });
+    assignCommittee(users);
+    saveUsers(users);
+    logAction("班委表分配", "按《班委职责表》重分配全部学生部门职务");
     return { ok: true };
   }
   // 当前会话用户归属的部门页（普通同学无部门则返回 null）
@@ -1192,19 +1472,54 @@ const STORE = (function () {
     if (!u || !u.department || (u.departmentRole !== "member" && u.departmentRole !== "minister")) return null;
     return { id: u.department, ...DEPTS[u.department], role: u.departmentRole };
   }
-  function adminResetPassword(uid) {
+  // 班主任/超管：设置任意新密码（哈希存储；forceChange 默认 true 强制下次改密）
+  async function adminSetPassword(uid, newPwd, forceChange) {
+    const op = getSession();
+    if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    const pwd = String(newPwd == null ? "" : newPwd);
+    if (pwd.length < 4) return { ok: false, msg: "密码至少 4 位" };
+    const users = getUsers();
+    const u = users.find((x) => x.id === uid);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    u.password = await hashPassword(pwd);
+    u.mustChange = forceChange !== false;
+    saveUsers(users);
+    logAction("设置密码", u.name + "（" + (pwd === DEFAULT_PWD ? "重置为初始密码" : "管理员设置新密码") + (u.mustChange ? "，强制改密" : "") + "）");
+    return { ok: true };
+  }
+  // 兼容旧调用：重置为默认密码
+  function adminResetPassword(uid) { return adminSetPassword(uid, DEFAULT_PWD, true); }
+  // 密码状态：仅返回 默认/已改，绝不暴露哈希
+  async function adminGetPwdStatus(uid) {
+    const op = getSession();
+    if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    const u = findById(uid);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    const isDefault = (await verifyPw(DEFAULT_PWD, u.password)) !== null;
+    return { ok: true, status: isDefault ? "default" : "changed", mustChange: !!u.mustChange };
+  }
+  // 班主任/超管：代改用户 姓名/昵称/头像（头像支持 dataUrl / r2: / image/<姓名>.jpg，空串=清除）
+  function adminUpdateProfile(uid, patch) {
     const op = getSession();
     if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
     const users = getUsers();
     const u = users.find((x) => x.id === uid);
     if (!u) return { ok: false, msg: "用户不存在" };
-    // 重置为默认密码的哈希
-    hashPassword(DEFAULT_PWD).then((h) => {
-      u.password = h;
-      u.mustChange = true;
-      saveUsers(users);
-    });
-    logAction("重置密码", u.name + "（重置为初始密码）");
+    const p = patch || {};
+    if (p.name !== undefined) {
+      const n = String(p.name).trim();
+      if (!n) return { ok: false, msg: "姓名不能为空" };
+      u.name = n;
+    }
+    if (p.nickname !== undefined) { u.nickname = String(p.nickname).trim().slice(0, 12); u.nickPending = ""; }
+    if (p.avatar !== undefined) {
+      const a = String(p.avatar || "");
+      if (a && !isImgSrc(a)) return { ok: false, msg: "图片无效" };
+      u.avatar = a;
+    }
+    saveUsers(users);
+    if (u.id === op.id) refreshSession();
+    logAction("修改用户资料", u.name + "（姓名/昵称/头像）");
     return { ok: true };
   }
 
@@ -1223,12 +1538,15 @@ const STORE = (function () {
     const list = getNews();
     list.unshift({ id: uid("news"), title: item.title, content: item.content, date: item.date || now(), ts: now() });
     lsSet(KEY.news, list);
+    logAction("发布班级新闻", "「" + item.title + "」");
     return { ok: true, list };
   }
   function deleteNews(id) {
     const op = getSession();
     if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    const target = getNews().find((n) => n.id === id);
     lsSet(KEY.news, getNews().filter((n) => n.id !== id));
+    logAction("删除班级新闻", target ? "「" + target.title + "」" : id);
     return { ok: true };
   }
 
@@ -1241,12 +1559,15 @@ const STORE = (function () {
     const list = getMedia();
     list.unshift({ id: uid("media"), src: item.src, caption: item.caption || "", album: item.album || "班级风采", ts: now() });
     lsSet(KEY.media, list);
+    logAction("添加媒体", item.album || "班级风采" + " · " + (item.caption || ""));
     return { ok: true, list };
   }
   function deleteMedia(id) {
     const op = getSession();
     if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    const target = getMedia().find((m) => m.id === id);
     lsSet(KEY.media, getMedia().filter((m) => m.id !== id));
+    logAction("删除媒体", target ? (target.album + " · " + (target.caption || id)) : id);
     return { ok: true };
   }
 
@@ -1301,9 +1622,15 @@ const STORE = (function () {
      普通成员：新建/编辑草稿、提交审核；部长/超管：直接发布、审核通过/驳回、删除
      ============================================================ */
   const DEPT_STORE_KEYS = {
-    jiwei: KEY.cases,
-    bianji: KEY.articles,
-    yiliao: KEY.meds,
+    xingzheng:   "xh_dept_xingzheng",
+    houqin:      KEY.meds,
+    xuexi:       "xh_dept_xuexi",
+    wenti:       "xh_dept_wenti",
+    jiwei:       KEY.cases,
+    xuanchuan:   "xh_dept_xuanchuan",
+    bianji:      KEY.articles,
+    xinxianquan: "xh_dept_xinxianquan",
+    huodong:     "xh_dept_huodong",
   };
   function getDeptItems(deptId) {
     const k = DEPT_STORE_KEYS[deptId];
@@ -1333,6 +1660,7 @@ const STORE = (function () {
     const list = getDeptItems(deptId);
     list.unshift(item);
     saveDeptItems(deptId, list);
+    logAction("发布部门内容", (DEPTS[deptId]?.name || deptId) + "：「" + (fields.title || fields.content || "(未命名)") + "」");
     return { ok: true, item, msg: direct ? "已直接发布" : "已保存草稿并提交部长审核" };
   }
 
@@ -1349,6 +1677,7 @@ const STORE = (function () {
     item.reviewTs = canApproveDept(deptId) ? now() : null;
     item.reviewer = canApproveDept(deptId) ? s.name : item.reviewer;
     saveDeptItems(deptId, list);
+    logAction("编辑部门内容", (DEPTS[deptId]?.name || deptId) + "：「" + (item.title || item.content || "(未命名)") + "」");
     return { ok: true, msg: item.status === "published" ? "已更新并发布" : "已更新并重新提交审核" };
   }
 
@@ -1362,12 +1691,83 @@ const STORE = (function () {
     if (approve) { item.status = "published"; item.reviewTs = now(); item.reviewer = s.name; }
     else { item.status = "rejected"; item.reviewTs = now(); item.reviewer = s.name; }
     saveDeptItems(deptId, list);
+    logAction("审核部门内容", (DEPTS[deptId]?.name || deptId) + "：「" + (item.title || item.content || "(未命名)") + "」" + (approve ? "通过" : "驳回"));
     return { ok: true };
   }
   // 删除（需部长/超管）
   function deleteDeptItem(deptId, id) {
     if (!canApproveDept(deptId)) return { ok: false, msg: "需要部长权限才能删除" };
     saveDeptItems(deptId, getDeptItems(deptId).filter((x) => x.id !== id));
+    logAction("删除部门内容", DEPTS[deptId]?.name + " · " + id);
+    return { ok: true };
+  }
+
+  /* ============================================================
+     部门弹窗公告：本部门成员可发布，登录后按部门弹窗展示
+     ============================================================ */
+  function getDeptNotices() { return lsGet(KEY.deptNotices, []); }
+  function addDeptNotice(deptId, fields) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    if (!canEditDept(deptId)) return { ok: false, msg: "你不属于该部门，无法操作" };
+    if (!fields || !fields.title) return { ok: false, msg: "请填写公告标题" };
+    const list = getDeptNotices();
+    const direct = canApproveDept(deptId);
+    list.unshift({
+      id: uid("dnt"),
+      dept: deptId,
+      title: fields.title,
+      content: fields.content || "",
+      status: direct ? "published" : "pending",
+      authorId: s.id,
+      authorName: s.nickname || s.name,
+      createdTs: now(),
+    });
+    lsSet(KEY.deptNotices, list);
+    logAction("发布部门弹窗公告", DEPTS[deptId]?.name + "：「" + fields.title + "」");
+    return { ok: true, msg: direct ? "已发布弹窗公告" : "已提交，待部长审核后弹窗" };
+  }
+  function reviewDeptNotice(id, approve) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    const list = getDeptNotices();
+    const n = list.find((x) => x.id === id);
+    if (!n) return { ok: false, msg: "公告不存在" };
+    if (!canApproveDept(n.dept)) return { ok: false, msg: "需要部长权限才能审核" };
+    n.status = approve ? "published" : "rejected";
+    lsSet(KEY.deptNotices, list);
+    logAction("审核部门弹窗公告", (DEPTS[n.dept]?.name || n.dept) + "：「" + n.title + "」" + (approve ? "通过" : "驳回"));
+    return { ok: true };
+  }
+  function deleteDeptNotice(id) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    const list = getDeptNotices();
+    const n = list.find((x) => x.id === id);
+    if (!n) return { ok: false, msg: "公告不存在" };
+    if (!canApproveDept(n.dept) && n.authorId !== s.id) return { ok: false, msg: "无权限删除" };
+    lsSet(KEY.deptNotices, list.filter((x) => x.id !== id));
+    logAction("删除部门弹窗公告", (DEPTS[n.dept]?.name || n.dept) + "：「" + n.title + "」");
+    return { ok: true };
+  }
+  // 当前用户未读的已发布弹窗公告（按本人全部部门职务匹配，已读记录存本人）
+  function unreadDeptNotices() {
+    const s = getSession(); if (!s) return [];
+    const u = findById(s.id);
+    if (!u) return [];
+    const myDepts = (Array.isArray(u.posts) ? u.posts : []).map((p) => p.dept);
+    if (u.department) myDepts.push(u.department);
+    const readIds = u.deptNoticesRead || [];
+    return getDeptNotices().filter((x) =>
+      x.status === "published" && readIds.indexOf(x.id) < 0 && myDepts.indexOf(x.dept) >= 0
+    );
+  }
+  function markDeptNoticeRead(ids) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    const u = findById(s.id);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    const read = u.deptNoticesRead || [];
+    (ids || []).forEach((id) => { if (read.indexOf(id) < 0) read.push(id); });
+    u.deptNoticesRead = read;
+    saveUsers(getUsers());
+    pushMe({ deptNoticesRead: read });
     return { ok: true };
   }
 
@@ -1391,6 +1791,7 @@ const STORE = (function () {
       status: "open",
     });
     saveReport(list);
+    logAction("提交举报", (fields.mode === "real" ? "实名" : "匿名") + " · 涉案：" + (fields.target || "未填"));
     return { ok: true };
   }
   function saveReport(list) { lsSet(KEY.reports, list); }
@@ -1401,6 +1802,7 @@ const STORE = (function () {
     const r = list.find((x) => x.id === id);
     if (r) { r.status = status || "closed"; }
     saveReport(list);
+    logAction("处理举报", (r && r.target ? "涉案：" + r.target : id) + " → " + (status || "closed"));
     return { ok: true };
   }
 
@@ -1415,6 +1817,7 @@ const STORE = (function () {
     const list = getAlbums();
     list.unshift({ id: uid("alb"), name, author: getSession().name, createdTs: now(), photos: [], status: canApproveDept("xuanchuan") ? "published" : "pending" });
     saveAlbums(list);
+    logAction("创建相册", "「" + name + "」");
     return { ok: true };
   }
   function addAlbumPhoto(albumId, dataUrl, caption) {
@@ -1424,6 +1827,7 @@ const STORE = (function () {
     if (!a) return { ok: false, msg: "相册不存在" };
     a.photos.push({ src: dataUrl, caption: caption || "", status: canApproveDept("xuanchuan") ? "published" : "pending", ts: now() });
     saveAlbums(list);
+    logAction("上传相册照片", a.name + " · " + (caption || "(无标题)"));
     return { ok: true };
   }
   function reviewAlbumPhoto(albumId, photoIndex, approve) {
@@ -1434,6 +1838,7 @@ const STORE = (function () {
     const p = a.photos[Number(photoIndex)];
     if (p) p.status = approve ? "published" : "rejected";
     saveAlbums(list);
+    logAction("审核相册照片", a.name + " · " + (approve ? "通过" : "驳回"));
     return { ok: true };
   }
   function deleteAlbumPhoto(albumId, photoIndex) {
@@ -1442,11 +1847,14 @@ const STORE = (function () {
     const a = list.find((x) => x.id === albumId);
     if (a) a.photos.splice(Number(photoIndex), 1);
     saveAlbums(list);
+    logAction("删除相册照片", a ? a.name : albumId);
     return { ok: true };
   }
   function deleteAlbum(albumId) {
     if (!canApproveDept("xuanchuan")) return { ok: false, msg: "需部长权限" };
+    const target = getAlbums().find((x) => x.id === albumId);
     saveAlbums(getAlbums().filter((x) => x.id !== albumId));
+    logAction("删除相册", target ? "「" + target.name + "」" : albumId);
     return { ok: true };
   }
   // 全部已发布照片（相册页展示）
@@ -1474,6 +1882,7 @@ const STORE = (function () {
     if (g.albums.some((a) => a.name === name)) return { ok: false, msg: "已存在同名相册" };
     g.albums.unshift({ id: uid("gal"), name, authorId: s.id, authorName: s.nickname || s.name, ts: now() });
     gallerySave(g);
+    logAction("创建公开相册", "「" + name + "」");
     return { ok: true, albumId: g.albums[0].id };
   }
   function galleryUpload(albumId, dataUrl, name) {
@@ -1483,6 +1892,8 @@ const STORE = (function () {
     if (!g.albums.some((x) => x.id === albumId)) return { ok: false, msg: "相册不存在" };
     g.photos.push({ id: uid("gp"), albumId, name: name || "未命名", src: dataUrl, uploaderId: s.id, uploaderName: s.nickname || s.name, ts: now() });
     gallerySave(g);
+    const album = g.albums.find((a) => a.id === albumId);
+    logAction("上传公开相册", (album ? album.name : albumId) + " · " + (name || "未命名"));
     return { ok: true };
   }
   function galleryCanManage(photo) {
@@ -1500,6 +1911,7 @@ const STORE = (function () {
     if (!galleryCanManage(p)) return { ok: false, msg: "仅上传者或管理员可修改" };
     p.name = newName;
     gallerySave(g);
+    logAction("重命名公开相册照片", newName);
     return { ok: true };
   }
   function galleryDeletePhoto(photoId) {
@@ -1509,6 +1921,7 @@ const STORE = (function () {
     if (!galleryCanManage(p)) return { ok: false, msg: "仅上传者或管理员可删除" };
     g.photos = g.photos.filter((x) => x.id !== photoId);
     gallerySave(g);
+    logAction("删除公开相册照片", p.name);
     return { ok: true };
   }
   function galleryDeleteAlbum(albumId) {
@@ -1516,9 +1929,11 @@ const STORE = (function () {
     if (!s) return { ok: false, msg: "请先登录" };
     if (!(isSuperAdmin(s.role) || s.role === "admin")) return { ok: false, msg: "仅管理员可删除相册" };
     const g = galleryGet();
+    const target = g.albums.find((a) => a.id === albumId);
     g.albums = g.albums.filter((a) => a.id !== albumId);
     g.photos = g.photos.filter((p) => p.albumId !== albumId);
     gallerySave(g);
+    logAction("删除公开相册", target ? "「" + target.name + "」" : albumId);
     return { ok: true };
   }
 
@@ -1533,11 +1948,26 @@ const STORE = (function () {
     const list = getNotices();
     list.unshift({ id: uid("nt"), title, content, author: s.name, ts: now() });
     lsSet(KEY.notices, list);
+    logAction("发布通知公告", "「" + title + "」");
+    return { ok: true, list };
+  }
+  function updateNotice(id, title, content) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    if (!isSuperAdmin(s.role)) return { ok: false, msg: "仅班主任/超管可编辑公告" };
+    if (!id || !title || !content) return { ok: false, msg: "标题与内容不能为空" };
+    const list = getNotices();
+    const n = list.find((x) => x.id === id);
+    if (!n) return { ok: false, msg: "公告不存在" };
+    n.title = title; n.content = content; n.ts = now();
+    lsSet(KEY.notices, list);
+    logAction("编辑通知公告", "「" + title + "」");
     return { ok: true, list };
   }
   function deleteNotice(id) {
     if (!isSuperAdmin(getSession()?.role)) return { ok: false, msg: "无权限" };
+    const target = getNotices().find((n) => n.id === id);
     lsSet(KEY.notices, getNotices().filter((n) => n.id !== id));
+    logAction("删除通知公告", target ? "「" + target.title + "」" : id);
     return { ok: true };
   }
 
@@ -1614,6 +2044,158 @@ const STORE = (function () {
     saveUsers(users);
     return { ok: true };
   }
+  // 管理员/班委：设置某小组组长（uid 为空则移除组长，原组长保留组员身份）
+  function setGroupLeader(groupId, uid) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    if (!isSuperAdmin(s.role) && s.role !== "monitor") return { ok: false, msg: "无权限" };
+    const groups = getGroups();
+    const g = groups.find((x) => x.id === groupId);
+    if (!g) return { ok: false, msg: "小组不存在" };
+    const users = getUsers();
+    if (uid) {
+      const u = users.find((x) => x.id === uid);
+      if (!u) return { ok: false, msg: "用户不存在" };
+      if (g.leaderId === uid) return { ok: true };
+      g.members = g.members.filter((m) => m.id !== uid);
+      g.members.unshift({ id: uid, name: u.name });
+      g.leaderId = uid;
+      g.leaderName = u.name;
+      g.note = "组长：" + u.name;
+      u.groupId = groupId;
+    } else {
+      g.leaderId = null;
+      g.leaderName = "";
+      g.note = "组长：待定";
+    }
+    saveGroups(groups);
+    saveUsers(users);
+    logAction("设置组长", g.name + " → " + (g.leaderName || "无"));
+    return { ok: true };
+  }
+  // ============================================================
+  // 小组长专享管理：组员 / 值日 / 班委头像（第二头像）
+  // ============================================================
+  // 小组长权限闸门：仅本组组长或超管可管理
+  function leaderGate(groupId) {
+    const s = getSession(); if (!s) return { ok: false, msg: "请先登录" };
+    const g = getGroups().find((x) => x.id === groupId);
+    if (!g) return { ok: false, msg: "小组不存在" };
+    if (isSuperAdmin(s.role) || g.leaderId === s.id) return { ok: true };
+    return { ok: false, msg: "仅本组组长可管理本组" };
+  }
+  // 当前用户身为组长的小组；不是组长返回 null
+  function myGroupAsLeader() {
+    const s = getSession(); if (!s) return null;
+    return getGroups().find((g) => g.leaderId === s.id) || null;
+  }
+  // 当前用户所在小组（组长或组员）
+  function myGroup() {
+    const s = getSession(); if (!s) return null;
+    return getGroups().find((g) => g.leaderId === s.id || g.members.some((m) => m.id === s.id)) || null;
+  }
+
+  // 小组长添加组员（可把任意同学拉进本组；若其在其他组会被移出）
+  function groupLeaderAddMember(groupId, uid) {
+    const gate = leaderGate(groupId); if (!gate.ok) return gate;
+    if (!uid) return { ok: false, msg: "请选择要加入的成员" };
+    const u = getUsers().find((x) => x.id === uid);
+    if (!u) return { ok: false, msg: "成员不存在" };
+    const groups = getGroups();
+    const g = groups.find((x) => x.id === groupId);
+    if (!g) return { ok: false, msg: "小组不存在" };
+    if (g.leaderId === uid) return { ok: true }; // 组长本人无需加入
+    groups.forEach((o) => {
+      o.members = o.members.filter((m) => m.id !== uid);
+      if (o.leaderId === uid) o.leaderId = null;
+    });
+    g.members = g.members.filter((m) => m.id !== uid);
+    if (!g.members.some((m) => m.id === uid)) g.members.push({ id: uid, name: u.name });
+    const users = getUsers();
+    const tu = users.find((x) => x.id === uid); if (tu) tu.groupId = g.id;
+    saveGroups(groups);
+    saveUsers(users);
+    logAction("组长添加组员", g.name + " → " + u.name);
+    return { ok: true };
+  }
+  // 小组长剔除组员（可备注理由，理由写入操作日志）
+  function groupLeaderRemoveMember(groupId, uid, reason) {
+    const gate = leaderGate(groupId); if (!gate.ok) return gate;
+    const groups = getGroups();
+    const g = groups.find((x) => x.id === groupId);
+    if (!g) return { ok: false, msg: "小组不存在" };
+    const mem = g.members.find((m) => m.id === uid);
+    if (!mem) return { ok: false, msg: "该成员不在本组" };
+    const r = String(reason || "").trim();
+    g.members = g.members.filter((m) => m.id !== uid);
+    const users = getUsers();
+    const u = users.find((x) => x.id === uid); if (u) u.groupId = "";
+    saveGroups(groups);
+    saveUsers(users);
+    logAction("组长剔除组员", g.name + " → " + mem.name + (r ? "（理由：" + r + "）" : ""));
+    return { ok: true, name: mem.name };
+  }
+
+  // ---- 值日分配：支持「具体日期」与「星期几循环」两种模式 ----
+  // week：1-7 表示每周循环到周{1-7}；0 表示具体日期（用 date）。
+  function groupDutyAssign({ groupId, week, date, memberId, task }) {
+    const gate = leaderGate(groupId); if (!gate.ok) return gate;
+    const g = getGroups().find((x) => x.id === groupId);
+    if (!g) return { ok: false, msg: "小组不存在" };
+    const u = getUsers().find((x) => x.id === memberId);
+    if (!u) return { ok: false, msg: "成员不存在" };
+    const t = String(task || "").trim();
+    if (!t) return { ok: false, msg: "请填写具体分工内容" };
+    const w = Number(week);
+    let useDate = "";
+    let useWeek = 0;
+    if (w >= 1 && w <= 7) {
+      useWeek = w;
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) {
+      useDate = date;
+    } else {
+      return { ok: false, msg: "请选择星期循环或具体日期" };
+    }
+    const list = getDuty();
+    list.push({
+      id: uid("du"), groupId, groupName: g.name,
+      week: useWeek, date: useDate, memberId, memberName: u.name, task: t, ts: now(),
+    });
+    lsSet(KEY.duty, list.sort((a, b) => String(a.date).localeCompare(String(b.date))));
+    return { ok: true };
+  }
+  // 组长/超管删除本组某条值日分工
+  function deleteGroupDuty(id) {
+    const d = getDuty().find((x) => x.id === id);
+    if (!d) return { ok: false, msg: "值日安排不存在" };
+    const gate = leaderGate(d.groupId); if (!gate.ok) return gate;
+    lsSet(KEY.duty, getDuty().filter((x) => x.id !== id));
+    return { ok: true };
+  }
+
+  // 班委头像（第二头像）：组长可为本组组员上传真实头像，上传即生效。
+  // 未设置时回退普通头像/班级介绍页 image/<姓名>.jpg。
+  async function setMemberPortrait(groupId, uid, dataUrl) {
+    const s = getSession(); if (!s) return { ok: false, msg: "请先登录" };
+    const g = getGroups().find((x) => x.id === groupId);
+    const isSelf = s.id === uid;
+    if (g && (g.leaderId === s.id || (isSelf && g.members.some((m) => m.id === uid)))) {
+      // 本组组长 或 组员本人
+    } else if (isSuperAdmin(s.role)) {
+      // 超管可代为任意上传
+    } else {
+      return { ok: false, msg: "仅本组组长或成员本人可上传本组头像" };
+    }
+    if (!isImgSrc(dataUrl)) return { ok: false, msg: "图片无效" };
+    const url = await uploadImg(dataUrl, "jpg");
+    const users = getUsers();
+    const u = users.find((x) => x.id === uid);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    u.portrait = url;
+    saveUsers(users);
+    if (isRemote() && s) pushDocs();
+    return { ok: true, src: url };
+  }
+
   // 小组积分统计（组长+组员）
   function groupStats() {
     const users = getUsers();
@@ -1646,11 +2228,14 @@ const STORE = (function () {
       ts: now(),
     });
     lsSet(KEY.wall, list);
+    logAction("发布悄悄话", "→ " + (toName || "全班") + " · " + t.slice(0, 30));
     return { ok: true };
   }
   function deleteWall(id) {
     if (!isSuperAdmin(getSession()?.role)) return { ok: false, msg: "仅超管可删除" };
+    const target = getWall().find((w) => w.id === id);
     lsSet(KEY.wall, getWall().filter((w) => w.id !== id));
+    logAction("删除悄悄话", target ? (target.toName + " · " + (target.text || "").slice(0, 20)) : id);
     return { ok: true };
   }
 
@@ -1679,6 +2264,7 @@ const STORE = (function () {
       responses: [],
     });
     saveVotes(list);
+    logAction("发起投票", "「" + title + "」" + (endDate || deadline ? " (截止 " + (endDate || deadline) + ")" : ""));
     return { ok: true, vote: list[0] };
   }
   // 实名投票（每人限一次）
@@ -1695,6 +2281,7 @@ const STORE = (function () {
     idxs.forEach((i) => { if (v.options[i]) v.options[i].count += 1; });
     v.responses.push({ uid: s.id, name: s.name, picks: idxs });
     saveVotes(list);
+    logAction("参与投票", "「" + v.title + "」 · 选 " + (idxs.map((i) => v.options[i]?.text).filter(Boolean).join("/") || "弃权"));
     return { ok: true };
   }
   function closeVote(id) {
@@ -1704,6 +2291,7 @@ const STORE = (function () {
     const v = list.find((x) => x.id === id);
     if (v) v.open = false;
     saveVotes(list);
+    logAction("结束投票", v ? "「" + v.title + "」" : id);
     return { ok: true };
   }
   function myVote(voteId) {
@@ -2038,9 +2626,11 @@ const STORE = (function () {
 
   /* ---------- 公开 API ---------- */
   /* ---------- R2 图片：上传 / 解析 ---------- */
-  // 合法的图源：base64 data:image 或 R2 引用 r2:xxx。
+  // 合法的图源：base64 data:image / R2 引用 r2:xxx / 本地 image/ 目录（头像联动班委图片）。
   function isImgSrc(src) {
-    return !!(src && (String(src).indexOf("data:image") === 0 || String(src).indexOf("r2:") === 0));
+    if (!src) return false;
+    const s = String(src);
+    return s.indexOf("data:image") === 0 || s.indexOf("r2:") === 0 || s.indexOf("image/") === 0;
   }
   // 上传：远程模式把 base64 推给 Worker 存 R2，成功返回 "r2:<key>"；否则安全回退原 base64。
   async function uploadImg(dataUrl, ext) {
@@ -2079,19 +2669,25 @@ const STORE = (function () {
     myLedger, myRedeems,
     requestNickname, reviewNickname, pendingNicknames, setAvatar,
     adminListUsers, adminUpdateRole, adminUpdateDept, adminResetPassword,
+    adminAddPost, adminRemovePost, adminSetPosts, adminApplyCommittee,
+    adminSetPassword, adminGetPwdStatus, adminUpdateProfile, backfillUserPosts, autoApplyCommittee,
+    deptRoleOf, isDeptMember, isMinister,
     getNews, addNews, deleteNews,
     getMedia, addMedia, deleteMedia,
-    DEPTS, canEditDept, canApproveDept, myDepartment,
+    DEPTS, COMMITTEE, PREV_COMMITTEE, canEditDept, canApproveDept, myDepartment,
     getDeptItems, saveDeptItems, addDeptItem, updateDeptItem, reviewDeptItem, deleteDeptItem,
+    getDeptNotices, addDeptNotice, reviewDeptNotice, deleteDeptNotice, unreadDeptNotices, markDeptNoticeRead,
     myReports, submitReport, markReport,
     getAlbums, saveAlbums, addAlbum, addAlbumPhoto, reviewAlbumPhoto, deleteAlbumPhoto, deleteAlbum, allPublishedPhotos,
     galleryGet, gallerySave, galleryCreateAlbum, galleryUpload, galleryCanManage, galleryRename, galleryDeletePhoto, galleryDeleteAlbum,
-    getNotices, addNotice, deleteNotice,
+    getNotices, addNotice, updateNotice, deleteNotice,
     getDuty, addDutyShift, deleteDutyShift,
     updateProfile, addPersonalImage, deletePersonalImage,
     uploadImg, resolveImg,
     grantBadge, revokeBadge,
-    getGroups, saveGroups, setUserGroup, groupStats,
+    getGroups, saveGroups, setUserGroup, setGroupLeader, groupStats,
+    myGroup, myGroupAsLeader, groupLeaderAddMember, groupLeaderRemoveMember,
+    groupDutyAssign, deleteGroupDuty, setMemberPortrait,
     getWall, postWall, deleteWall,
     getVotes, createVote, castVote, closeVote, myVote, canManageVotes,
     archive,

@@ -37,10 +37,13 @@
 
   <main class="container" style="padding:40px 0 20px;">
     <div class="panel" id="noticeManage" style="display:none;margin-bottom:26px;">
-      <h3>发布通知（班主任/超管）</h3>
+      <h3 id="noticeManageTitle">发布公告（班主任/超管）</h3>
       <div class="field"><label>标题</label><input class="mini" id="ntTitle" style="width:100%;"></div>
       <div class="field"><label>内容</label><textarea class="mini" id="ntContent" rows="4"></textarea></div>
-      <button class="btn btn-block" id="btnAddNotice" style="max-width:200px;">发布</button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn btn-block" id="btnAddNotice" style="max-width:200px;">发布</button>
+        <button class="btn-outline" id="btnCancelEdit" style="display:none;">取消编辑</button>
+      </div>
     </div>
 
     <div id="noticeList"></div>
@@ -92,6 +95,24 @@
 
     if (isAdmin) document.getElementById("noticeManage").style.display = "block";
 
+    let editingId = null;
+    const elTitle = document.getElementById("ntTitle");
+    const elContent = document.getElementById("ntContent");
+    const btnSubmit = document.getElementById("btnAddNotice");
+    const btnCancel = document.getElementById("btnCancelEdit");
+
+    function setEditing(on) {
+      btnSubmit.textContent = on ? "保存修改" : "发布";
+      btnCancel.style.display = on ? "" : "none";
+      document.getElementById("noticeManageTitle").textContent = on ? "编辑公告" : "发布公告（班主任/超管）";
+    }
+    function resetForm() {
+      editingId = null;
+      elTitle.value = "";
+      elContent.value = "";
+      setEditing(false);
+    }
+
     function render() {
       const list = STORE.getNotices();
       const box = document.getElementById("noticeList");
@@ -102,24 +123,36 @@
         <div class="panel" style="margin-bottom:16px;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
             <h3>${esc(n.title)}</h3>
-            ${isAdmin ? '<button class="btn-outline" data-del="' + n.id + '" style="padding:5px 12px;font-size:12px;">删除</button>' : ""}
+            ${isAdmin ? '<span style="display:inline-flex;gap:6px;"><button class="btn-outline" data-edit="' + n.id + '" style="padding:5px 12px;font-size:12px;">编辑</button><button class="btn-outline" data-del="' + n.id + '" style="padding:5px 12px;font-size:12px;">删除</button></span>' : ""}
           </div>
           <p style="white-space:pre-wrap;color:var(--text-soft);margin-top:8px;">${esc(n.content)}</p>
           <div class="hint" style="font-size:12.5px;color:var(--muted);margin-top:12px;">${esc(n.author)} · ${STORE.fmtTime(n.ts)}</div>
         </div>`).join("");
+      document.querySelectorAll("[data-edit]").forEach((b) => {
+        b.addEventListener("click", () => {
+          const n = STORE.getNotices().find((x) => x.id === b.dataset.edit);
+          if (!n) return;
+          editingId = n.id;
+          elTitle.value = n.title;
+          elContent.value = n.content;
+          setEditing(true);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
       document.querySelectorAll("[data-del]").forEach((b) => {
-        b.addEventListener("click", () => { if (!confirm("确认删除该通知？")) return; STORE.deleteNotice(b.dataset.del); render(); });
+        b.addEventListener("click", () => { if (!confirm("确认删除该公告？")) return; STORE.deleteNotice(b.dataset.del); if (editingId === b.dataset.del) resetForm(); render(); });
       });
     }
 
-    document.getElementById("btnAddNotice").addEventListener("click", () => {
-      const title = document.getElementById("ntTitle").value.trim();
-      const content = document.getElementById("ntContent").value.trim();
+    btnSubmit.addEventListener("click", () => {
+      const title = elTitle.value.trim();
+      const content = elContent.value.trim();
       if (!title || !content) { alert("标题与内容不能为空"); return; }
-      const r = STORE.addNotice(title, content);
-      if (r.ok) { alert("已发布"); document.getElementById("ntTitle").value = ""; document.getElementById("ntContent").value = ""; render(); }
+      const r = editingId ? STORE.updateNotice(editingId, title, content) : STORE.addNotice(title, content);
+      if (r.ok) { alert(editingId ? "已更新" : "已发布"); resetForm(); render(); }
       else alert(r.msg);
     });
+    btnCancel.addEventListener("click", resetForm);
 
     render();
   })();

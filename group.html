@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
+  <meta name="description" content="星河班 · 小组 —— 组长管理组员、安排值日分工、上传班委头像">
+  <title>小组 · 星河班</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">星河班</span><br>
+          <span class="brand-sub">昆三中度假学校 · 八年级一班</span>
+        </span>
+      </a>
+      <nav class="main-nav" id="mainNav"><ul></ul></nav>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <div class="crumbs"><a href="index.html">首页</a><span class="sep">/</span><span>小组</span></div>
+      <span class="eyebrow">Group</span>
+      <h1>小组</h1>
+      <p class="sub" id="heroSub">小组学习、生活、卫生，你我一起守护。</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding:40px 0 20px;">
+
+    <!-- 组员列表 / 组长面板 -->
+    <div class="panel" style="margin-bottom:26px;">
+      <h3 id="grpTitle">我的小组</h3>
+      <div class="toolbar" style="justify-content:space-between;margin-bottom:12px;" id="grpMemberBar"></div>
+      <div id="grpMemberList"></div>
+      <input type="file" id="filePortrait" accept="image/*" style="display:none;">
+    </div>
+
+    <!-- 值日安排（组长面板） -->
+    <div class="panel" style="display:none;margin-bottom:26px;" id="leadPanel">
+      <h3>安排值日分工（本组）</h3>
+      <div class="field"><label>排班方式</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <select class="mini" id="duMode" style="max-width:140px;">
+            <option value="week">按星期循环</option>
+            <option value="date">按具体日期</option>
+          </select>
+          <select class="mini" id="duWeek" style="max-width:120px;display:none;">
+            <option value="">选择星期…</option>
+            <option value="1">星期一</option><option value="2">星期二</option><option value="3">星期三</option>
+            <option value="4">星期四</option><option value="5">星期五</option><option value="6">星期六</option><option value="7">星期日</option>
+          </select>
+          <input class="mini" type="date" id="duDate" style="display:none;max-width:170px;">
+          <select class="mini" id="duMember" style="max-width:150px;"></select>
+          <input class="mini" id="duTask" placeholder="具体分工（如：擦黑板、扫地、倒垃圾…）" style="flex:1;min-width:180px;">
+        </div>
+      </div>
+      <button class="btn" id="btnAddDuty" style="margin-top:6px;">添加分工</button>
+      <div id="grpDutyList" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- 完整值日表（所有人可见） -->
+    <div class="panel" style="display:none;margin-bottom:26px;" id="grpDutyFull">
+      <h3>值日安排</h3>
+      <div id="grpDutyFullBody">加载中…</div>
+    </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark"><img src="image/班级logo.jpg" alt="星河班logo" onerror="this.style.display='none'">
+          <span class="mark-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span></span>
+            <span class="brand-name" style="color:#fff;">星河班</span>
+          </div>
+          <p class="footer-desc">昆三中度假学校 八年级一班。聚星河之力，启无限之航，记录我们共同走过的每一段青春。</p>
+        </div>
+        <div class="footer-col">
+          <h4>网站栏目</h4>
+          <ul>
+            <li><a href="class.html">班级介绍</a></li>
+            <li><a href="group.html">小组</a></li>
+            <li><a href="duty.html">值日表</a></li>
+            <li><a href="bank.html">操行银行</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 星河班 · 昆三中度假学校八年级一班</span>
+        <span>博学笃行，逐梦星河</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+  (async function () {
+    await STORE.ensureSeeded();
+    const s = STORE.getSession();
+    if (!s) { location.href = "login.html"; return; }
+    const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const WD = ["日", "一", "二", "三", "四", "五", "六"];
+    const users = () => STORE.getUsers();
+    const userById = (id) => users().find((x) => x.id === id) || null;
+    const self = userById(s.id);
+
+    // 头像：优先班委头像 portrait，其次普通 avatar，最后姓名首字
+    function portraitHtml(memberId, name, size) {
+      const size2 = size || 52;
+      const u = userById(memberId);
+      const src = u && u.portrait ? STORE.resolveImg(u.portrait)
+        : (u && u.avatar ? STORE.resolveImg(u.avatar) : "");
+      if (src) return '<img src="' + src + '" alt="' + esc(name) + '" style="width:' + size2 + 'px;height:' + size2 + 'px;border-radius:50%;object-fit:cover;border:1px solid var(--line-2);background:var(--bg);">';
+      return '<span style="width:' + size2 + 'px;height:' + size2 + 'px;border-radius:50%;display:inline-grid;place-items:center;background:var(--bg);color:var(--muted);font-family:var(--font-light);font-size:' + (size2 * 0.45) + 'px;border:1px solid var(--line-2);">' + esc((name || "星").charAt(0)) + '</span>';
+    }
+
+    let myGrp = STORE.myGroup() || STORE.myGroupAsLeader() || null;
+    const isLead = !!(STORE.myGroupAsLeader() || (s.role && (s.role === "admin" || s.role === "superadmin")));
+
+    // 组员上传头像（压缩为 400px 真实图）
+    let pendingPortrait = null;
+    function pickPortrait(groupId, memberId, name) {
+      pendingPortrait = { groupId, memberId, name };
+      document.getElementById("filePortrait").click();
+    }
+    function compressImage(file, cb) {
+      const fr = new FileReader();
+      fr.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          const MAX = 600;
+          if (w > MAX || h > MAX) { const k = Math.min(MAX / w, MAX / h); w = Math.round(w * k); h = Math.round(h * k); }
+          const c = document.createElement("canvas"); c.width = w; c.height = h;
+          c.getContext("2d").drawImage(img, 0, 0, w, h);
+          cb(c.toDataURL("image/jpeg", 0.88));
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    }
+    document.getElementById("filePortrait").addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      if (!f || !pendingPortrait) return;
+      const p = pendingPortrait; pendingPortrait = null;
+      compressImage(f, async (dataUrl) => {
+        const r = await STORE.setMemberPortrait(p.groupId, p.memberId, dataUrl);
+        alert(r.ok ? "班委头像已更新（上传即生效）" : r.msg);
+        renderMembers();
+      });
+    });
+
+    function renderMembers() {
+      myGrp = STORE.myGroup() || STORE.myGroupAsLeader() || null;
+      const title = document.getElementById("grpTitle");
+      const bar = document.getElementById("grpMemberBar");
+      const list = document.getElementById("grpMemberList");
+      const leadPanel = document.getElementById("leadPanel");
+      const leadBtn = document.getElementById("leadPanelToggle");
+
+      if (!myGrp) {
+        title.textContent = "我还没有小组";
+        bar.innerHTML = "";
+        leadPanel.style.display = "none";
+        document.getElementById("grpDutyFull").style.display = "block";
+        list.innerHTML = '<p class="muted-note">你尚未被分配到小组，请联系班主任或组长。</p>';
+        renderFullDuty();
+        return;
+      }
+
+      const g = myGrp;
+      title.textContent = "我的小组 · " + g.name + (isLead ? "（你是组长）" : "");
+      const members = [g.leaderId].concat(g.members.map((m) => m.id)).filter(Boolean);
+
+      // 组长工具栏
+      if (isLead && g.leaderId === s.id) {
+        leadPanel.style.display = "block";
+        const cands = users().filter((u) => u.role !== "teacher" && !members.includes(u.id));
+        bar.innerHTML =
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%;">' +
+          '<span class="hint" style="font-size:12.5px;">当前 ' + members.length + ' 人 · 组长' + (g.leaderName ? " " + esc(g.leaderName) : "") + '</span>' +
+          (cands.length ? '<select class="mini" id="addMemberSel" style="flex:1;min-width:150px;"><option value="">选择要加入的同学…</option>' + cands.map((u2) => '<option value="' + u2.id + '">' + esc(u2.nickname || u2.name) + '</option>').join("") + "</select>" +
+            '<button class="btn" id="btnAddMember">加入本组</button>' : '') +
+          '</div>';
+        const bm = document.getElementById("btnAddMember");
+        if (bm) bm.addEventListener("click", () => {
+          const uid = document.getElementById("addMemberSel").value;
+          const r = STORE.groupLeaderAddMember(g.id, uid);
+          alert(r.ok ? "已加入本组" : r.msg); renderMembers();
+        });
+        // 值日成员下拉
+        document.getElementById("duMember").innerHTML = members.map((mid) => {
+          const u2 = userById(mid); if (!u2) return "";
+          return '<option value="' + mid + '">' + esc(u2.nickname || u2.name) + '</option>';
+        }).join("");
+      } else {
+        leadPanel.style.display = "none";
+      }
+
+      list.innerHTML = members.map((mid) => {
+        const u = userById(mid);
+        if (!u) return "";
+        const isLeader = g.leaderId === mid;
+        const isSelf = mid === s.id;
+        return '<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);">' +
+          portraitHtml(mid, u.name) +
+          '<div style="flex:1;min-width:0;">' +
+          '<b>' + esc(u.nickname || u.name) + '</b>' + (isLeader ? ' <span class="pwd-tag" style="color:#b8860b;border-color:#e5c06f;">组长</span>' : "") +
+          '<div class="hint" style="font-size:12.5px;color:var(--muted);">' + esc(u.name) +
+          (u.portrait ? ' <span style="color:#2a9d3f;">· 已上传班委头像</span>' : ' · 未上传班委头像') + '</div></div>' +
+          (isLead ? '<input type="file" accept="image/*" style="display:none;" data-pu="' + mid + '" title="上传班委头像">' +
+            '<button class="btn-outline" style="padding:5px 10px;font-size:12px;" data-pick="' + mid + '">' + (u.portrait ? "更换班委头像" : "上传班委头像") + '</button>' : "") +
+          (isLead && !isLeader ? '<button class="btn-outline" style="padding:5px 10px;font-size:12px;color:#d33;" data-kick="' + mid + '">剔除</button>' : "") +
+          '</div>';
+      }).join("") || '<p class="muted-note">本组暂无可显示成员。</p>';
+
+      // 头像挑选
+      document.querySelectorAll("[data-pick]").forEach((b) => {
+        b.addEventListener("click", () => pickPortrait(g.id, b.dataset.pick));
+      });
+      // 剔除（带理由）
+      document.querySelectorAll("[data-kick]").forEach((b) => {
+        b.addEventListener("click", () => {
+          const uid = b.dataset.kick;
+          const u = userById(uid);
+          if (!u) return;
+          const reason = prompt("确认从本组剔除「" + u.name + "」？可填写理由：", "");
+          if (reason === null) return;
+          const r = STORE.groupLeaderRemoveMember(g.id, uid, reason);
+          alert(r.ok ? "已剔除" : r.msg); renderMembers();
+        });
+      });
+
+      renderGrpDuty();
+      renderFullDuty();
+    }
+
+    // 本组值日管理列表 + 完整值日表
+    function renderGrpDuty() {
+      if (!myGrp) return;
+      const listEl = document.getElementById("grpDutyList");
+      const g = myGrp;
+      const duties = STORE.getDuty().filter((d) => d.groupId === g.id);
+      if (!duties.length) { listEl.innerHTML = '<p class="muted-note">还没安排值日，用上面的表单添加吧。</p>'; return; }
+      listEl.innerHTML = duties.map((d) => {
+        const label = d.week >= 1 && d.week <= 7 ? "每周" + WD[d.week] + "：" :
+          (d.date ? esc(fmtDate(d.date)) + "：" : "");
+        const u = userById(d.memberId);
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);">' +
+          portraitHtml(d.memberId, d.memberName || (u && u.name)) +
+          '<div style="flex:1;"><b>' + label + esc(d.memberName) + '</b><div class="hint" style="font-size:12.5px;color:var(--text-soft);">' + esc(d.task) + '</div></div>' +
+          '<button class="btn-outline" style="padding:4px 10px;font-size:12px;" data-duel="' + d.id + '">删除</button></div>';
+      }).join("");
+      document.querySelectorAll("[data-duel]").forEach((b) => {
+        b.addEventListener("click", () => {
+          if (!confirm("确认删除该值日分工？")) return;
+          const r = STORE.deleteGroupDuty(b.dataset.duel);
+          alert(r.ok ? "已删除" : r.msg); renderMembers();
+        });
+      });
+    }
+    function fmtDate(iso) {
+      const p = String(iso).split("-");
+      return p[0] + "年" + Number(p[1]) + "月" + Number(p[2]) + "日";
+    }
+    function renderFullDuty() {
+      const box = document.getElementById("grpDutyFullBody");
+      const duties = STORE.getDuty();
+      if (!duties.length) { box.innerHTML = '<p class="muted-note">暂无值日安排。</p>'; return; }
+      // 分组：星期循环 与 具体日期
+      const weekItems = duties.filter((d) => d.week >= 1 && d.week <= 7);
+      const dateItems = duties.filter((d) => !(d.week >= 1 && d.week <= 7));
+      const WD2 = ["日", "一", "二", "三", "四", "五", "六"];
+      let html = "";
+      if (weekItems.length) {
+        html += '<div class="hint" style="font-size:12.5px;color:var(--text-soft);margin-bottom:6px;">每周循环</div>';
+        for (let w = 1; w <= 7; w++) {
+          const items = weekItems.filter((d) => d.week === w);
+          if (!items.length) continue;
+          html += '<div style="margin:4px 0;">星期' + WD2[w] + '：' + items.map((d) => esc(d.memberName) + "（" + esc(d.task) + "）").join("、") + '</div>';
+        }
+      }
+      if (dateItems.length) {
+        html += '<div class="hint" style="font-size:12.5px;color:var(--text-soft);margin:10px 0 6px;">具体日期</div>';
+        dateItems.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach((d) => {
+          html += '<div style="margin:4px 0;">' + fmtDate(d.date) + '：' + esc(d.memberName) + "（" + esc(d.task) + "）</div>";
+        });
+      }
+      box.innerHTML = html;
+    }
+
+    // 排序方式切换
+    const duMode = document.getElementById("duMode");
+    duMode.addEventListener("change", () => {
+      const isWeek = duMode.value === "week";
+      document.getElementById("duWeek").style.display = isWeek ? "" : "none";
+      document.getElementById("duDate").style.display = isWeek ? "none" : "";
+    });
+    document.getElementById("btnAddDuty").addEventListener("click", () => {
+      if (!myGrp) { alert("请先拥有小组"); return; }
+      const isWeek = duMode.value === "week";
+      const r = STORE.groupDutyAssign({
+        groupId: myGrp.id,
+        week: isWeek ? Number(document.getElementById("duWeek").value) : 0,
+        date: isWeek ? "" : document.getElementById("duDate").value,
+        memberId: document.getElementById("duMember").value,
+        task: document.getElementById("duTask").value,
+      });
+      if (r.ok) { alert("已安排"); document.getElementById("duTask").value = ""; renderMembers(); }
+      else alert(r.msg);
+    });
+
+    renderMembers();
+  })();
+  </script>
+</body>
+</html>

@@ -309,6 +309,8 @@
     function switchTo(key) {
       curKey = key;
       done = false;
+      wrap.classList.remove("tp-done");
+      wrap.style.display = "";
       if (current && current._host) { current._host.innerHTML = ""; }
       wrap.innerHTML = "";
       var bar = buildBar();
@@ -317,7 +319,18 @@
       host.className = "tp-host";
       wrap.appendChild(host);
       var builder = BUILDERS[key];
-      current = builder(host, function (v) { done = v; if (v && window.showToast) window.showToast("人机验证通过", "success"); });
+      current = builder(host, function (v) {
+        done = v;
+        if (v) {
+          if (window.showToast) window.showToast("人机验证通过", "success");
+          // 验证成功后彻底隐藏验证组件（不再占位，DOM 也清掉，避免残留）
+          setTimeout(function () {
+            wrap.classList.add("tp-done");
+            wrap.style.display = "none";
+            if (host) host.innerHTML = "";
+          }, 280);
+        }
+      });
       current._host = host;
     }
 

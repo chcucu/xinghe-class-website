@@ -23,16 +23,23 @@
     ["班级荣誉", "honor.html"],
     ["班级新闻", "news.html"],
     ["成长档案", "archive.html"],
-    ["宣传部", "department.html?dept=xuanchuan"],
+    // 部门（与《星河班班委职责表》一致）
+    ["行政部", "department.html?dept=xingzheng"],
+    ["后勤部", "department.html?dept=houqin"],
+    ["学习部", "department.html?dept=xuexi"],
+    ["文体部", "department.html?dept=wenti"],
     ["纪检部", "department.html?dept=jiwei"],
+    ["宣传部", "department.html?dept=xuanchuan"],
     ["编辑部", "department.html?dept=bianji"],
-    ["医疗部", "department.html?dept=yiliao"],
+    ["信息安全部", "department.html?dept=xinxianquan"],
+    ["活动策划部", "department.html?dept=huodong"],
+    ["班级商店", "shop.html"],
+    ["小组", "group.html"],
     ["值日表", "duty.html"],
     ["投票", "votes.html"],
     ["悄悄话墙", "messages.html"],
     ["活动接龙", "signup.html"],
     ["操行银行", "bank.html"],
-    ["班级商店", "shop.html"],
   ];
 
   // 访客/家长仅可见公开页面（家长额外可看成长档案）
@@ -93,6 +100,47 @@
       strip.innerHTML = '<a class="us-item us-link" href="identity.html">登录</a>';
     }
   }
+
+  // ============ 登录后弹窗展示未读部门公告 ============
+  (function () {
+    var just = null;
+    try { just = sessionStorage.getItem("xh_just_login"); } catch (e) { just = null; }
+    if (just !== "1") return;
+    try { sessionStorage.removeItem("xh_just_login"); } catch (e) {}
+    var list = [];
+    try { list = STORE.unreadDeptNotices(); } catch (e) { list = []; }
+    if (!list.length) return;
+    var items = list.map(function (n) {
+      return '<div style="padding:14px 0;border-bottom:1px dashed var(--line);">' +
+        '<div style="font-size:15px;color:var(--ink);margin-bottom:4px;">' +
+        (STORE.DEPTS[n.dept] ? STORE.DEPTS[n.dept].name : n.dept) + ' · ' + esc(n.title) + '</div>' +
+        (n.content ? '<div style="font-size:13.5px;color:var(--text-soft);line-height:1.7;">' + esc(n.content) + '</div>' : '') +
+        '<div style="font-size:12px;color:var(--muted);margin-top:6px;">' + STORE.fmtTime(n.createdTs) + ' · ' + esc(n.authorName || '') + '</div>' +
+        '</div>';
+    }).join("");
+    var mask = document.createElement("div");
+    mask.className = "modal-mask open";
+    mask.innerHTML = '<div class="modal" style="max-width:460px;">' +
+      '<span class="win-tl" style="margin-bottom:14px;"><i class="r"></i><i class="y"></i><i class="g"></i></span>' +
+      '<div class="m-title">部门公告</div>' +
+      '<div class="m-sub">你有 ' + list.length + ' 条部门公告未读。</div>' +
+      '<div style="max-height:320px;overflow:auto;margin-bottom:20px;">' + items + '</div>' +
+      '<button type="button" class="btn btn-block" id="deptNoticeClose">我知道了</button>' +
+      '</div>';
+    document.body.appendChild(mask);
+    var ids = list.map(function (n) { return n.id; });
+    var btn = document.getElementById("deptNoticeClose");
+    if (btn) btn.addEventListener("click", function () {
+      try { STORE.markDeptNoticeRead(ids); } catch (e) {}
+      if (mask.parentNode) mask.parentNode.removeChild(mask);
+    });
+    mask.addEventListener("click", function (e) {
+      if (e.target === mask) {
+        try { STORE.markDeptNoticeRead(ids); } catch (e) {}
+        if (mask.parentNode) mask.parentNode.removeChild(mask);
+      }
+    });
+  })();
 
   // ============ 页脚：反馈入口（全站） ============
   (function () {

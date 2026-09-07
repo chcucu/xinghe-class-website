@@ -96,12 +96,15 @@
         <div class="admin-tabs" id="manageTabs">
           <button data-mt="add" class="active">发布新内容</button>
           <button data-mt="mytab">我的草稿 / 待审</button>
+          <button data-mt="notice">弹窗公告</button>
           <button data-mt="reports">举报箱</button>
         </div>
         <!-- 发布新内容 -->
         <div id="mt-add"></div>
         <!-- 我的草稿列表 -->
         <div id="mt-mytab" style="display:none;"></div>
+        <!-- 弹窗公告（登录后弹窗展示） -->
+        <div id="mt-notice" style="display:none;"></div>
         <!-- 举报箱（纪检） -->
         <div id="mt-reports" style="display:none;"></div>
       </div>
@@ -285,10 +288,13 @@
         tabBtns.forEach((b) => b.classList.toggle("active", b.dataset.mt === tab));
         document.getElementById("mt-add").style.display = tab === "add" ? "" : "none";
         document.getElementById("mt-mytab").style.display = tab === "mytab" ? "" : "none";
+        const nt = document.getElementById("mt-notice");
+        if (nt) { nt.style.display = tab === "notice" ? "" : "none"; }
         const rp = document.getElementById("mt-reports");
         if (rp) { rp.style.display = (tab === "reports" && isJiwei) ? "" : "none"; }
         if (tab === "add") renderAddForm();
         if (tab === "mytab") renderMyTab();
+        if (tab === "notice") renderNotices();
         if (tab === "reports" && isJiwei) renderReports();
       }
       tabBtns.forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.mt)));
@@ -323,7 +329,7 @@
           document.querySelectorAll("#mt-add [data-k]").forEach((el) => {
             fields[el.dataset.k] = el.dataset.file ? (el._val || "") : el.value.trim();
           });
-          if ((deptId === "bianji" || deptId === "yiliao") && !fields.title) { alert("请填写标题"); return; }
+          if ((deptId === "bianji" || deptId === "houqin") && !fields.title) { alert("请填写标题"); return; }
           if (isJiwei && !fields.title && !fields.detail) { alert("请填写案件标题或经过"); return; }
           const r = STORE.addDeptItem(deptId, fields);
           alert(r.msg || (r.ok ? "已提交" : "失败"));
@@ -348,6 +354,38 @@
         host.querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", () => { STORE.reviewDeptItem(deptId, b.dataset.ok, true); alert("已发布"); renderMyTab(); renderPublished(); }));
         host.querySelectorAll("[data-no]").forEach((b) => b.addEventListener("click", () => { STORE.reviewDeptItem(deptId, b.dataset.no, false); alert("已驳回"); renderMyTab(); }));
         host.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认删除？")) return; STORE.deleteDeptItem(deptId, b.dataset.del); renderMyTab(); renderPublished(); }));
+      }
+
+      // 弹窗公告（本部门登录后弹窗展示）
+      function renderNotices() {
+        const host = document.getElementById("mt-notice");
+        host.innerHTML =
+          '<div class="field"><label>弹窗公告标题</label><input class="mini" id="dntTitle" style="width:100%;" placeholder="登录后会自动弹窗给本部门成员"></div>' +
+          '<div class="field"><label>公告内容</label><textarea class="mini" id="dntContent" rows="3"></textarea></div>' +
+          '<button class="btn btn-block" id="btnAddDnt" style="max-width:200px;">发布弹窗公告</button>' +
+          '<div id="dntList" style="margin-top:18px;"></div>';
+        document.getElementById("btnAddDnt").addEventListener("click", () => {
+          const r = STORE.addDeptNotice(deptId, {
+            title: document.getElementById("dntTitle").value.trim(),
+            content: document.getElementById("dntContent").value.trim(),
+          });
+          alert(r.msg || (r.ok ? "已发布" : "失败"));
+          if (r.ok) { document.getElementById("dntTitle").value = ""; document.getElementById("dntContent").value = ""; renderNotices(); }
+        });
+        const list = STORE.getDeptNotices().filter((x) => x.dept === deptId);
+        const wrap = document.getElementById("dntList");
+        if (!list.length) { wrap.innerHTML = '<p class="muted-note">暂无弹窗公告。</p>'; return; }
+        wrap.innerHTML = list.map((n) => {
+          const stLabel = n.status === "published" ? "已发布" : n.status === "pending" ? "待审核" : "已驳回";
+          return '<div class="redeem-item"><div class="ri-body"><b>' + esc(n.title) + '</b>' +
+            (n.content ? '<div class="ri-cost">' + esc(n.content) + '</div>' : "") +
+            '<div class="ri-cost">' + stLabel + ' · ' + STORE.fmtTime(n.createdTs) + ' · ' + esc(n.authorName) + '</div></div>' +
+            (canApprove && n.status === "pending" ? '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;margin-right:6px;" data-ok="' + n.id + '">通过</button><button class="btn-outline" style="padding:6px 12px;font-size:12.5px;margin-right:6px;" data-no="' + n.id + '">驳回</button>' : "") +
+            '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" data-del="' + n.id + '">删除</button></div>';
+        }).join("");
+        wrap.querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", () => { STORE.reviewDeptNotice(b.dataset.ok, true); alert("已通过"); renderNotices(); }));
+        wrap.querySelectorAll("[data-no]").forEach((b) => b.addEventListener("click", () => { STORE.reviewDeptNotice(b.dataset.no, false); alert("已驳回"); renderNotices(); }));
+        wrap.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认删除该弹窗公告？")) return; STORE.deleteDeptNotice(b.dataset.del); renderNotices(); }));
       }
 
       // 举报箱（纪检成员）

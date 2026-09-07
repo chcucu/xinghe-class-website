@@ -2,3 +2,9 @@
 .wrangler/
 backend/.wrangler/
 node_modules/
+.tools/
+.trae/
+# 临时文件
+9fd18412*.txt
+~$*
+js/_edit_test.txt

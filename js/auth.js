@@ -22,6 +22,8 @@
 
   function goAfterLogin() {
     const s = STORE.getSession();
+    // 标记本次会话刚登录，供目标页弹出未读部门公告
+    try { sessionStorage.setItem("xh_just_login", "1"); } catch (e) {}
     // 全站登录：登录后跳回来源页，否则默认首页；首次改密除外
     const params = new URLSearchParams(location.search);
     const next = params.get("next");
@@ -44,7 +46,12 @@
   // 登录
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (tp && !tp.verify()) { showError("请先完成人机验证"); if (tp.refresh) tp.refresh(); return; }
+    if (tp && !tp.verify()) {
+      showError("请先完成人机验证");
+      // 仅当用户主动刷新或被自动重置时再调用 refresh，避免验证已通过又被强制显示
+      if (tp.refresh && !tp.verify()) tp.refresh();
+      return;
+    }
     const account = document.getElementById("account").value.trim();
     const password = document.getElementById("password").value;
     if (!account || !password) { showError("请填写账号和密码"); return; }

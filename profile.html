@@ -210,9 +210,12 @@
     document.getElementById("infoName").textContent = s.name;
     document.getElementById("infoAccount").textContent = s.account;
     document.getElementById("infoRole").textContent = roleLabel;
-    const dp = STORE.DEPTS[self.department];
-    document.getElementById("infoDept").textContent = self.department && dp
-      ? dp.name + (self.departmentRole === "minister" ? " · 部长" : " · 成员")
+    const posts = Array.isArray(self.posts) ? self.posts.slice() : [];
+    if (self.department && !posts.some((p) => p.dept === self.department)) {
+      posts.unshift({ dept: self.department, role: self.departmentRole === "minister" ? "minister" : "member" });
+    }
+    document.getElementById("infoDept").textContent = posts.length
+      ? posts.map((p) => (STORE.DEPTS[p.dept]?.name || p.dept) + (p.role === "minister" ? " · 部长" : " · 成员")).join("、")
       : "—";
     const scoreEl = document.getElementById("infoScore");
     if (self && (self.role === "student" || self.role === "superadmin")) {

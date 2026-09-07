@@ -256,7 +256,7 @@ async function docsRegister(request, env) {
     studentId: body.studentId || "", studentName: body.studentName || "",
     registerTs: new Date().toISOString(), score: 0,
     nickname: "", nickPending: "", avatar: "",
-    department: "", departmentRole: "",
+    department: "", departmentRole: "", posts: [],
     contact, bio: "", personalImages: [], badges: [], groupId: "", mustChange: false,
   };
   // 乐观并发追加用户：账号查重 + 家长关联学生校验都在同一 CAS 内完成，避免并发注册互相覆盖
@@ -324,6 +324,15 @@ async function updateMe(request, env, auth) {
     allowed.personalImages = body.personalImages.slice(0, 12).map((it) =>
       typeof it === "string" ? { src: it, ts: new Date().toISOString() } : it
     );
+  }
+  // 超管可代改 姓名/昵称（普通用户不可自改，姓名/昵称变更由管理员在后台完成）
+  if (body.name !== undefined && isSuper(auth.role)) {
+    const n = String(body.name).trim();
+    if (n) allowed.name = n.slice(0, 20);
+  }
+  if (body.nickname !== undefined && isSuper(auth.role)) {
+    allowed.nickname = String(body.nickname).trim().slice(0, 12);
+    allowed.nickPending = ""; // 代改后清除待审申请，避免冲突
   }
   // 仅允许用户更新自己的密码（哈希）与首次改密标记；绝不允许改 role/score 等
   // 密码哈希既可能是旧无盐 SHA-256(64hex)，也可能是新加盐 `盐.摘要`(32hex.64hex)
@@ -526,7 +535,8 @@ async function casDoc(env, key, mutate, initVal) {
 // ---- 提权防护：PUT /docs 权限由服务端权威判定 ----
 const SCORE_ROLES = ["teacher", "admin", "monitor", "superadmin"]; // 有权改积分/覆盖 users 的角色
 function canScoreRole(role) { return SCORE_ROLES.includes(role); }
-// 非超管写 users 时，用服务端既有值冻结 role/status，防止教班委自提权或代别人审批恢复
+// 非超管写 users 时，用服务端既有值冻结 role/status/职务字段，防止教班委自提权、
+// 篡改部门职务或代别人审批恢复
 function guardUserRoles(incoming, existing) {
   const map = {};
   (Array.isArray(existing) ? existing : []).forEach((u) => { if (u && u.id) map[u.id] = u; });
@@ -536,6 +546,9 @@ function guardUserRoles(incoming, existing) {
     const out = Object.assign({}, u);
     out.role = old.role || u.role;
     out.status = old.status || u.status;
+    out.posts = Array.isArray(old.posts) ? old.posts : (old.department ? [{ dept: old.department, role: old.departmentRole === "minister" ? "minister" : "member" }] : []);
+    out.department = old.department || "";
+    out.departmentRole = old.departmentRole || "";
     return out;
   });
 }

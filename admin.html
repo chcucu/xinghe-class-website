@@ -24,6 +24,13 @@
     textarea.mini { width:100%; min-height:96px; resize:vertical; }
     .stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-bottom:28px; }
     @media (max-width:720px){ .stat-row{ grid-template-columns:repeat(2,1fr); } }
+    .chip { display:inline-flex; align-items:center; gap:5px; font-family:var(--font-play); font-size:12px; color:var(--ink); background:var(--bg-soft); border:1px solid var(--line-2); border-radius:999px; padding:3px 10px; margin:0 6px 6px 0; cursor:default; }
+    .chip a { color:#d33; text-decoration:none; font-size:13px; line-height:1; }
+    .chip.add { color:#888; cursor:pointer; text-decoration:none; }
+    .chip.add:hover { border-color:var(--ink); color:var(--ink); }
+    .pwd-tag { display:inline-block; font-size:12px; padding:2px 9px; border-radius:999px; border:1px solid var(--line-2); color:var(--muted); white-space:nowrap; }
+    .pwd-tag.default { color:#b8860b; border-color:#e5c06f; }
+    .pwd-tag.changed { color:var(--text-soft); }
   </style>
 </head>
 <body>
@@ -100,7 +107,7 @@
       <div class="panel" style="padding:0;overflow:hidden;">
         <table class="admin-table">
           <thead>
-            <tr><th>成员</th><th>账号</th><th>角色</th><th>积分</th><th>昵称</th><th>部门 · 职务</th><th>操作</th></tr>
+            <tr><th>成员</th><th>账号</th><th>角色</th><th>积分</th><th>昵称</th><th>部门 · 职务</th><th>密码</th><th>操作</th></tr>
           </thead>
           <tbody id="usersBody"></tbody>
         </table>
@@ -150,7 +157,11 @@
     <section class="admin-section" id="tab-dept">
       <div class="panel" style="margin-bottom:22px;">
         <h3>部门与职务分配</h3>
-        <p class="muted-note" style="margin-bottom:12px;">给成员分配所属部门（宣传部/纪检部/编辑部/医疗部/市场监督管理局）与部门职务（成员 / 部长）。部长可审批本部门内容发布，市监局负责审批营业执照与商品。</p>
+        <p class="muted-note" style="margin-bottom:12px;">依据《星河班班委职责表》一键分配后，可在「用户管理」表里按人增删多部门职务（一人可兼任多部门）。部长对本部门内容发布与弹窗公告有审批权。</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="btn" id="btnApplyCommittee">按班委表一键分配</button>
+          <span class="muted-note" style="font-size:12.5px;">覆盖全体学生，按职责表自动分配多部门职务；手工调整过的职务也会被重置。</span>
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;" id="deptAssign"></div>
       </div>
 
@@ -167,11 +178,16 @@
 
       <div class="panel">
         <h3>小组维护</h3>
-        <p class="muted-note" style="margin-bottom:12px;">组长已登记（李张涵 杨骐雨 闫熙曼 康寇佳琪 李欣桐 李俊娴 柴丽欣），开学后在此把同学拉进对应小组。</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-          <select class="mini" id="grpUser" style="flex:1;min-width:160px;"></select>
-          <select class="mini" id="grpPick" style="flex:1;min-width:160px;"></select>
-          <button class="btn" id="btnAssignGrp">分配</button>
+        <p class="muted-note" style="margin-bottom:12px;">给同学分配小组，或设置 / 移除小组组长（组长可查看小组积分）。</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:14px;">
+          <div class="field" style="margin:0;"><label>成员</label><select class="mini" id="grpUser" style="width:100%;"></select></div>
+          <div class="field" style="margin:0;"><label>目标小组</label><select class="mini" id="grpPick" style="width:100%;"></select></div>
+          <div class="field" style="margin:0;display:flex;align-items:flex-end;"><button class="btn" id="btnAssignGrp" style="width:100%;">分配入组</button></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:14px;">
+          <div class="field" style="margin:0;"><label>组长候选人</label><select class="mini" id="grpLeaderUser" style="width:100%;"></select></div>
+          <div class="field" style="margin:0;"><label>小组</label><select class="mini" id="grpLeaderPick" style="width:100%;"></select></div>
+          <div class="field" style="margin:0;display:flex;align-items:flex-end;gap:8px;"><button class="btn" id="btnSetLeader" style="flex:1;">设为组长</button><button class="btn-outline" id="btnClearLeader">卸任</button></div>
         </div>
         <div id="groupManage"></div>
       </div>
@@ -209,6 +225,20 @@
       </div>
     </section>
   </main>
+
+  <!-- 管理操作弹窗（设密码 / 编辑资料 / 添加职务） -->
+  <div class="modal-mask" id="admModal">
+    <div class="modal" style="max-width:480px;">
+      <span class="win-tl" style="margin-bottom:14px;"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+      <div class="m-title" id="admModalTitle"></div>
+      <div class="m-sub" id="admModalSub"></div>
+      <div id="admModalBody"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+        <button class="btn-outline" id="admModalCancel">取消</button>
+        <button class="btn" id="admModalOk">确认</button>
+      </div>
+    </div>
+  </div>
 
   <footer class="site-footer">
     <div class="container">
@@ -301,31 +331,47 @@
     function renderUsers() {
       const users = STORE.getUsers();
       users.sort((a, b) => (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9) || a.name.localeCompare(b.name, "zh"));
-      const deptSelect = (u) =>
-        '<select class="mini" data-dept="' + u.id + '" style="max-width:150px;">' +
-        '<option value="">（无部门）</option>' +
-        Object.keys(STORE.DEPTS).map((k) => '<option value="' + k + '" ' + (u.department === k ? "selected" : "") + '>' + STORE.DEPTS[k].name + '</option>').join("") +
-        '</select>';
       const roleSelect = (u) =>
-        '<select class="mini" data-dept-role="' + u.id + '" style="max-width:84px;" ' + (u.department ? "" : "disabled") + '>' +
-        '<option value="member" ' + (u.departmentRole === "member" ? "selected" : "") + '>成员</option>' +
-        '<option value="minister" ' + (u.departmentRole === "minister" ? "selected" : "") + '>部长</option>' +
-        '</select>';
+        '<select class="mini" data-role="' + u.id + '">' +
+        ["student", "monitor", "teacher", "admin", "superadmin", "parent", "guest"].map((r) => `<option value="${r}" ${u.role === r ? "selected" : ""}>${roleLabel[r]}</option>`).join("") +
+        "</select>";
 
-      document.getElementById("usersBody").innerHTML = users.map((u) => `
-        <tr data-uid="${u.id}">
+      document.getElementById("usersBody").innerHTML = users.map((u) => {
+        const posts = Array.isArray(u.posts) ? u.posts : [];
+        const postChips = (u.role === "student" || u.role === "monitor" || u.role === "superadmin")
+          ? (posts.length
+              ? '<div style="display:flex;flex-wrap:wrap;align-items:center;">' +
+                posts.map((p) => '<span class="chip">' + esc(STORE.DEPTS[p.dept]?.name || p.dept) + "·" + (p.role === "minister" ? "部长" : "成员") + '</span>').join("") +
+                "</div>"
+              : '<span class="muted-note">无职务</span>')
+          : '<span class="muted-note">—</span>';
+        const deptCell = (u.role === "student" || u.role === "monitor" || u.role === "superadmin") ? postChips : '<span class="muted-note">—</span>';
+        return `<tr data-uid="${u.id}">
           <td><span style="display:inline-flex;align-items:center;gap:10px;">${avatarHtml(u)}<span class="rank-name">${esc(u.name)}</span>${u.superadmin ? '<span class="pc-role" style="margin-left:6px;">超管</span>' : ''}</span></td>
           <td>${esc(u.account)}</td>
-          <td>
-            <select class="mini" data-role="${u.id}">
-              ${["student","monitor","teacher","admin","superadmin","parent","guest"].map((r) => `<option value="${r}" ${u.role === r ? "selected" : ""}>${roleLabel[r]}</option>`).join("")}
-            </select>
-          </td>
+          <td>${roleSelect(u)}</td>
           <td>${(u.role === "student" || u.role === "superadmin") ? STORE.fmtMoney(u.score) : "—"}</td>
           <td class="muted-note">${esc(dispName(u))}</td>
-          <td>${(u.role === "student" || u.role === "monitor" || u.role === "superadmin") ? '<div style="display:flex;gap:6px;">' + deptSelect(u) + roleSelect(u) + "</div>" : '<span class="muted-note">—</span>'}</td>
-          <td><button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" data-reset="${u.id}">重置密码</button></td>
-        </tr>`).join("");
+          <td>${deptCell}</td>
+          <td><span class="pwd-tag" id="pwd-${u.id}">…</span></td>
+          <td style="white-space:nowrap;">
+            <button class="btn-outline" style="padding:5px 10px;font-size:12px;margin-right:5px;" data-reset="${u.id}">重置密码</button>
+            <button class="btn-outline" style="padding:5px 10px;font-size:12px;margin-right:5px;" data-editpwd="${u.id}">设密码</button>
+            <button class="btn-outline" style="padding:5px 10px;font-size:12px;" data-edit="${u.id}">编辑资料</button>
+          </td>
+        </tr>`;
+      }).join("");
+
+      // 密码状态异步查询（只显示 默认/已改，绝不显示明文或哈希）
+      users.forEach((u) => {
+        STORE.adminGetPwdStatus(u.id).then((d) => {
+          const el = document.getElementById("pwd-" + u.id);
+          if (!el || !d.ok) return;
+          const txt = d.status === "default" ? "默认密码" : "已修改";
+          el.textContent = txt + (d.mustChange ? " · 待改密" : "");
+          el.className = "pwd-tag " + (d.status === "default" ? "default" : "changed");
+        });
+      });
 
       document.querySelectorAll("[data-role]").forEach((sel) => {
         sel.addEventListener("change", () => {
@@ -334,34 +380,175 @@
           else { alert("角色已更新"); renderUsers(); }
         });
       });
-      document.querySelectorAll("[data-dept]").forEach((sel) => {
-        sel.addEventListener("change", () => {
-          const uid = sel.dataset.dept;
-          const roleSel = document.querySelector('[data-dept-role="' + uid + '"]');
-          const r = STORE.adminUpdateDept(uid, sel.value, sel.value && roleSel ? (roleSel.value || "member") : "");
-          alert(r.ok ? "部门已更新" : r.msg);
+      // 移除单个部门职务（多职务）
+      document.querySelectorAll("[data-rmpost]").forEach((a) => {
+        a.addEventListener("click", () => {
+          const [uid, dept] = a.dataset.rmpost.split(":");
+          if (!confirm("确认移除该用户的「" + (STORE.DEPTS[dept]?.name || dept) + "」职务？")) return;
+          const r = STORE.adminRemovePost(uid, dept);
+          alert(r.ok ? "已移除" : r.msg);
           renderUsers();
           if (typeof renderDept === "function") renderDept();
         });
       });
-      document.querySelectorAll("[data-dept-role]").forEach((sel) => {
-        sel.addEventListener("change", () => {
-          const uid = sel.dataset.deptRole;
-          const deptSel = document.querySelector('[data-dept="' + uid + '"]');
-          const r = STORE.adminUpdateDept(uid, deptSel ? deptSel.value : "", sel.value);
-          alert(r.ok ? "职务已更新" : r.msg);
-          renderUsers();
-          if (typeof renderDept === "function") renderDept();
-        });
+      // 添加部门职务
+      document.querySelectorAll("[data-addpost]").forEach((a) => {
+        a.addEventListener("click", () => openAddPostModal(a.dataset.addpost));
       });
+      // 重置密码
       document.querySelectorAll("[data-reset]").forEach((btn) => {
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", async () => {
           if (!confirm("确认将该用户密码重置为默认 123456？")) return;
-          const r = STORE.adminResetPassword(btn.dataset.reset);
+          const r = await STORE.adminResetPassword(btn.dataset.reset);
           if (r.ok) alert("已重置为 123456，该用户下次登录需重新设置密码");
           else alert(r.msg);
+          renderUsers();
         });
       });
+      // 设置任意新密码
+      document.querySelectorAll("[data-editpwd]").forEach((btn) => {
+        btn.addEventListener("click", () => openPwdModal(btn.dataset.editpwd));
+      });
+      // 编辑资料（姓名/昵称/头像）
+      document.querySelectorAll("[data-edit]").forEach((btn) => {
+        btn.addEventListener("click", () => openProfileModal(btn.dataset.edit));
+      });
+    }
+
+    /* ---- 管理弹窗 ---- */
+    const admModal = document.getElementById("admModal");
+    let admCtx = null;
+    function openModal(title, sub, html, okText, onOk) {
+      document.getElementById("admModalTitle").textContent = title;
+      document.getElementById("admModalSub").textContent = sub;
+      document.getElementById("admModalBody").innerHTML = html;
+      document.getElementById("admModalOk").textContent = okText || "确认";
+      admCtx = { onOk };
+      admModal.classList.add("open");
+    }
+    function closeModal() { admModal.classList.remove("open"); admCtx = null; pmPostsCache = null; }
+    document.getElementById("admModalCancel").addEventListener("click", closeModal);
+    admModal.addEventListener("click", (e) => { if (e.target === admModal) closeModal(); });
+    document.getElementById("admModalOk").addEventListener("click", () => { if (admCtx && admCtx.onOk) admCtx.onOk(); });
+
+    // 添加部门职务（多职务）
+    function openAddPostModal(uid) {
+      const u = STORE.getUsers().find((x) => x.id === uid);
+      if (!u) return;
+      const deptOpts = Object.keys(STORE.DEPTS).map((k) => '<option value="' + k + '">' + STORE.DEPTS[k].name + '</option>').join("");
+      openModal("添加部门职务", esc(u.name) + " 可同时兼任多个部门，部长对本部门内容有审批权。",
+        '<div class="field"><label for="pmDept">部门</label><select id="pmDept" class="mini" style="width:100%;">' + deptOpts + "</select></div>" +
+        '<div class="field"><label for="pmRole">职务</label><select id="pmRole" class="mini" style="width:100%;"><option value="member">成员</option><option value="minister">部长</option></select></div>',
+        "添加", () => {
+          const r = STORE.adminAddPost(uid, document.getElementById("pmDept").value, document.getElementById("pmRole").value);
+          alert(r.ok ? "已添加" : r.msg);
+          if (r.ok) { closeModal(); renderUsers(); if (typeof renderDept === "function") renderDept(); }
+        });
+    }
+    // 设置密码（留空则重置为 123456）
+    function openPwdModal(uid) {
+      const u = STORE.getUsers().find((x) => x.id === uid);
+      if (!u) return;
+      openModal("设置密码", esc(u.name) + " · 账号 " + esc(u.account),
+        '<div class="field"><label for="pmPwd">新密码（4 位以上，留空则重置为 123456）</label><input id="pmPwd" class="mini" style="width:100%;" maxlength="32" placeholder="留空则重置为 123456"></div>' +
+        '<div class="field" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="pmForce" checked><label for="pmForce" style="margin:0;">强制该用户下次登录改密</label></div>',
+        "保存", async () => {
+          const pwd = document.getElementById("pmPwd").value.trim() || "123456";
+          const r = await STORE.adminSetPassword(uid, pwd, document.getElementById("pmForce").checked);
+          alert(r.ok ? "密码已设置" : r.msg);
+          if (r.ok) { closeModal(); renderUsers(); }
+        });
+    }
+    // 编辑资料（姓名/昵称/头像/部门职务）
+    // pmPostsCache：弹窗内职务增删暂存（重开弹窗不丢），关闭/保存后重置
+    let pmPostsCache = null;
+    function openProfileModal(uid) {
+      const u = STORE.getUsers().find((x) => x.id === uid);
+      if (!u) return;
+      let av = u.avatar;
+      if (pmPostsCache === null) pmPostsCache = (Array.isArray(u.posts) ? u.posts : []).map((p) => ({ dept: p.dept, role: p.role }));
+      const pmPosts = pmPostsCache;
+      const deptOpts = Object.keys(STORE.DEPTS).map((k) => '<option value="' + k + '">' + STORE.DEPTS[k].name + '</option>').join("");
+      const postsHtml = () =>
+        '<div style="display:flex;flex-wrap:wrap;align-items:center;margin-bottom:8px;">' +
+        (pmPosts.length
+          ? pmPosts.map((p, i) => '<span class="chip">' + esc(STORE.DEPTS[p.dept]?.name || p.dept) + "·" + (p.role === "minister" ? "部长" : "成员") +
+            ' <a href="javascript:;" data-pmrm="' + i + '" title="移除该职务">×</a></span>').join("")
+          : '<span class="muted-note" style="font-size:12.5px;">暂无职务（未在班委表）</span>') +
+        "</div>" +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+        '<select class="mini" id="pmAddDept" style="flex:1;min-width:120px;">' + deptOpts + "</select>" +
+        '<select class="mini" id="pmAddRole" style="width:86px;"><option value="member">成员</option><option value="minister">部长</option></select>' +
+        '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" id="pmAddPost">添加职务</button></div>';
+      const prevHtml = () => av
+        ? '<img src="' + STORE.resolveImg(av) + '" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--line-2);">'
+        : '<span style="width:64px;height:64px;border-radius:50%;display:inline-grid;place-items:center;background:var(--bg);color:var(--muted);border:1px solid var(--line-2);">' + esc((u.name || "星").charAt(0)) + "</span>";
+      const isStudent = u.role === "student" || u.role === "monitor" || u.role === "superadmin";
+      openModal("编辑资料", esc(u.name) + " · 姓名 / 昵称 / 头像 / 部门职务。",
+        '<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;"><div id="pmAvatarPrev">' + prevHtml() + "</div>" +
+        '<input type="file" id="pmAvatarFile" accept="image/*" style="display:none;">' +
+        '<div style="display:flex;flex-direction:column;gap:6px;">' +
+        '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" id="pmPickImg">上传头像</button>' +
+        '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" id="pmClearImg">清除头像</button></div></div>' +
+        '<div class="field"><label for="pmName">姓名</label><input id="pmName" class="mini" style="width:100%;" maxlength="20" value="' + esc(u.name) + '"></div>' +
+        '<div class="field"><label for="pmNick">昵称（留空表示用姓名）</label><input id="pmNick" class="mini" style="width:100%;" maxlength="12" value="' + esc(u.nickname || "") + '"></div>' +
+        (isStudent ? '<div class="field"><label>部门职务（班委表已自动分配，可在此微调）</label>' + postsHtml() + "</div>" : ""),
+        "保存", () => {
+          const name = document.getElementById("pmName").value.trim();
+          if (!name) { alert("姓名不能为空"); return; }
+          const r = STORE.adminUpdateProfile(uid, { name, nickname: document.getElementById("pmNick").value.trim(), avatar: av });
+          if (!r.ok) { alert(r.msg); return; }
+          if (isStudent) {
+            const pr = STORE.adminSetPosts(uid, pmPosts);
+            if (!pr.ok) { alert(pr.msg); return; }
+          }
+          alert("已保存");
+          closeModal(); renderUsers(); if (typeof renderDept === "function") renderDept();
+        });
+      document.getElementById("pmPickImg").addEventListener("click", () => document.getElementById("pmAvatarFile").click());
+      document.getElementById("pmAvatarFile").addEventListener("change", (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        readImage(f, (dataUrl) => { av = dataUrl; document.getElementById("pmAvatarPrev").innerHTML = prevHtml(); });
+      });
+      document.getElementById("pmClearImg").addEventListener("click", () => { av = ""; document.getElementById("pmAvatarPrev").innerHTML = prevHtml(); });
+      if (isStudent) {
+        // 职务移除/添加（保存时统一写入）
+        document.getElementById("pmAddPost").addEventListener("click", () => {
+          const dept = document.getElementById("pmAddDept").value;
+          const role = document.getElementById("pmAddRole").value;
+          const i = pmPosts.findIndex((p) => p.dept === dept);
+          if (i >= 0) pmPosts[i].role = role; else pmPosts.push({ dept, role });
+          openProfileModal(uid); // 重开以刷新职务区
+        });
+        document.querySelectorAll("[data-pmrm]").forEach((a) => {
+          a.addEventListener("click", () => {
+            const i = Number(a.dataset.pmrm);
+            if (!pmPosts[i]) return;
+            if (!confirm("确认移除「" + (STORE.DEPTS[pmPosts[i].dept]?.name || pmPosts[i].dept) + "」职务？")) return;
+            pmPosts.splice(i, 1);
+            openProfileModal(uid);
+          });
+        });
+      }
+    }
+    // 本地压缩头像（最长边 400px，JPEG 0.85）
+    function readImage(file, cb) {
+      const fr = new FileReader();
+      fr.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          const MAX = 400;
+          if (w > MAX || h > MAX) { const k = Math.min(MAX / w, MAX / h); w = Math.round(w * k); h = Math.round(h * k); }
+          const c = document.createElement("canvas");
+          c.width = w; c.height = h;
+          c.getContext("2d").drawImage(img, 0, 0, w, h);
+          cb(c.toDataURL("image/jpeg", 0.85));
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
     }
 
     /* ---- 注册审核 ---- */
@@ -455,12 +642,12 @@
       document.getElementById("deptAssign").innerHTML =
         '<select class="mini" id="deptTarget" style="width:100%;">' +
         users.map((u) => '<option value="' + u.id + '">' + (u.nickname || u.name) + '</option>').join("") + "</select>" +
-        '<select class="mini" id="deptPick" style="width:100%;"><option value="">（不设部门）</option>' + deptOpts() + "</select>" +
+        '<select class="mini" id="deptPick" style="width:100%;"><option value="">（不设主部门）</option>' + deptOpts() + "</select>" +
         '<select class="mini" id="deptRolePick" style="width:100%;"><option value="member">成员</option><option value="minister">部长</option></select>' +
-        '<button class="btn" id="btnDeptAssign" style="width:100%;">保存部门分配</button>';
+        '<button class="btn" id="btnDeptAssign" style="width:100%;">保存主部门分配</button>';
       document.getElementById("btnDeptAssign").addEventListener("click", () => {
         const r = STORE.adminUpdateDept(document.getElementById("deptTarget").value, document.getElementById("deptPick").value, document.getElementById("deptRolePick").value);
-        alert(r.ok ? "已保存" : r.msg); renderDept();
+        alert(r.ok ? "已保存" : r.msg); renderDept(); renderUsers();
       });
 
       // 勋章授予对象
@@ -468,10 +655,22 @@
       renderBadges();
 
       // 小组分配
-      document.getElementById("grpUser").innerHTML = STORE.getUsers().filter((u) => u.role !== "teacher").map((u) => '<option value="' + u.id + '">' + (u.nickname || u.name) + '</option>').join("");
-      document.getElementById("grpPick").innerHTML = '<option value="">（不分组）</option>' + STORE.getGroups().map((g) => '<option value="' + g.id + '">' + g.name + " · " + g.leaderName + '</option>').join("");
+      const grpCands = STORE.getUsers().filter((u) => u.role !== "teacher").map((u) => '<option value="' + u.id + '">' + (u.nickname || u.name) + '</option>').join("");
+      document.getElementById("grpUser").innerHTML = grpCands;
+      document.getElementById("grpLeaderUser").innerHTML = grpCands;
+      const grpOpts = '<option value="">（不分组）</option>' + STORE.getGroups().map((g) => '<option value="' + g.id + '">' + g.name + " · " + g.leaderName + '</option>').join("");
+      document.getElementById("grpPick").innerHTML = grpOpts;
+      document.getElementById("grpLeaderPick").innerHTML = '<option value="">（选择小组）</option>' + STORE.getGroups().map((g) => '<option value="' + g.id + '">' + g.name + '</option>').join("");
       renderGroups();
     }
+
+    // 一键按《班委职责表》分配多部门职务
+    document.getElementById("btnApplyCommittee").addEventListener("click", () => {
+      if (!confirm("确认按《星河班班委职责表》一键重分配全体学生的部门职务？之前手工调整的职务将被覆盖。")) return;
+      const r = STORE.adminApplyCommittee();
+      alert(r.ok ? "已按班委表完成分配" : r.msg);
+      renderUsers(); renderDept();
+    });
 
     function renderBadges() {
       const uid = document.getElementById("bdgUser")?.value;
@@ -495,17 +694,42 @@
     function renderGroups() {
       const gs = STORE.getGroups();
       const stats = STORE.groupStats();
+      const cands = STORE.getUsers().filter((u) => u.role !== "teacher").map((u) => ({ id: u.id, name: u.nickname || u.name }));
       document.getElementById("groupManage").innerHTML = gs.map((g) => {
         const st = stats.find((x) => x.id === g.id);
         const members = [g.leaderId ? "组长 " + g.leaderName : ""].concat(g.members.map((m) => m.name)).filter(Boolean);
         return '<div class="redeem-item"><div class="ri-body"><b>' + esc(g.name) + '</b><div class="ri-cost">' +
           (st ? st.memberCount + " 人 · 总分 " + STORE.fmtMoney(st.scoreSum) : "") + '</div>' +
-          (members.length ? '<div class="ri-cost">' + members.map(esc).join("、") + "</div>" : "") + "</div></div>";
+          (members.length ? '<div class="ri-cost">' + members.map(esc).join("、") + "</div>" : "") + "</div>" +
+          '<select class="mini" data-gleader="' + g.id + '" style="min-width:132px;">' +
+          '<option value="">（移除组长）</option>' +
+          cands.map((c) => '<option value="' + c.id + '" ' + (g.leaderId === c.id ? "selected" : "") + '>' + esc(c.name) + '</option>').join("") +
+          "</select></div>";
       }).join("");
+      document.querySelectorAll("[data-gleader]").forEach((sel) => {
+        sel.addEventListener("change", () => {
+          const r = STORE.setGroupLeader(sel.dataset.gleader, sel.value || null);
+          alert(r.ok ? (sel.value ? "组长已更新" : "已移除组长") : r.msg);
+          renderGroups(); renderUsers(); renderDept();
+        });
+      });
     }
     document.getElementById("btnAssignGrp").addEventListener("click", () => {
       const r = STORE.setUserGroup(document.getElementById("grpUser").value, document.getElementById("grpPick").value);
-      alert(r.ok ? "已分配" : r.msg); renderGroups();
+      alert(r.ok ? "已分配" : r.msg); renderGroups(); renderUsers();
+    });
+    document.getElementById("btnSetLeader").addEventListener("click", () => {
+      const gid = document.getElementById("grpLeaderPick").value;
+      const uid = document.getElementById("grpLeaderUser").value;
+      if (!gid) { alert("请选择小组"); return; }
+      const r = STORE.setGroupLeader(gid, uid);
+      alert(r.ok ? "已设为组长" : r.msg); renderGroups(); renderUsers(); renderDept();
+    });
+    document.getElementById("btnClearLeader").addEventListener("click", () => {
+      const gid = document.getElementById("grpLeaderPick").value;
+      if (!gid) { alert("请选择小组"); return; }
+      const r = STORE.setGroupLeader(gid, null);
+      alert(r.ok ? "已移除组长" : r.msg); renderGroups(); renderUsers(); renderDept();
     });
 
     /* ---- 投票管理 ---- */
