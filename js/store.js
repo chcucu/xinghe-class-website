@@ -43,6 +43,7 @@ const STORE = (function () {
     logs: "xh_logs",            // 管理员操作日志
     gallery: "xh_gallery",      // 公开相册：成员/家长共同上传
     cashouts: "xh_cashouts",    // 零花钱兑换：孩子向家长申请兑换零花钱
+    groupsVer: "xh_groups_ver", // 小组名单版本：每次名单改动 +1，触发 rebuildGroupsFromList 重建小组（不动其它数据）
     seedVer: "xh_seed_ver",
   };
 
@@ -63,20 +64,37 @@ const STORE = (function () {
     huodong:     { name: "活动策划部", title: "活动方案", desc: "活动方案设计 · 史册记录", page: "department.html?dept=huodong" },
   };
 
+  /* ---------- 分组名单（核对后，每组首位为组长） ----------
+     GROUP_VERSION 每次名单改动时 +1，触发 rebuildGroupsFromList() 更新线上小组数据；
+     只重建小组文档（group 列表 + 各用户 groupId），不影响积分/密码/兑换等其它数据。 */
+  const GROUP_VERSION = "g8";
+  /* ---------- 教师名单版本：改动 data/teachers.json 时 +1，触发 syncTeachersFromJson 增量同步线上教师 ---------- */
+  const T_VERSION = "t2";
+  const GROUP_LIST = [
+    { leader: "郑雨嘉",   members: ["杨雯瑶", "邹奕宁", "汤程杰", "孙明远", "许文昊"] },
+    { leader: "李雨婷",   members: ["关茗心", "徐立凡", "谢沂萱", "李张涵", "周廷翰"] },
+    { leader: "杨萌",     members: ["赵津仪", "王翼航", "何兆轩", "徐开萍", "陈天和"] },
+    { leader: "杨骐羽",   members: ["刘慕辰", "张芝清", "何汶锦", "梁书宁", "单立安"] },
+    { leader: "康寇佳琦", members: ["吴优", "闫熙曼", "杨馨", "赵翌旭", "王煜滢"] },
+    { leader: "柴丽欣",   members: ["赵晨雅", "李静苒", "马睿瞳", "陈劲豪", "韦尚轩"] },
+    { leader: "吴明慧",   members: ["李文芳", "李俊娴", "李欣桐", "郑翀", "付楚珵"] },
+    { leader: "沈杜晨希", members: ["宋彦霖", "云健凌", "吴亦翾", "洪晨竣", "杨天泽", "焦柔溪"] },
+  ];
+
   /* ---------- 班委职责表（与《星河班班委职责表》一致） ----------
      图片按姓名自动关联：image/<姓名>.jpg，换图即生效；无图时显示姓名首字占位。 */
   const COMMITTEE = [
     { dept: "xingzheng", name: "行政部", brief: "代表班级形象，组织班委会，协调监督各班委工作。", members: [
       { role: "行政部长（班长）", name: "关茗心", duty: "负责外交，喊上下课口号，组织班委会，协调、安排、监督其他班委工作；搜集上报表册、资料、考勤；处理突发、紧急事务；组织优秀评选" },
       { role: "副班长 · 星河银行行长", name: "何汶锦", duty: "管理班级星河银行，统计星河币；负责「富豪榜」统计" },
-      { role: "一组小组长", name: "杨骐羽", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "一组小组长", name: "郑雨嘉", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
       { role: "二组小组长", name: "李雨婷", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
       { role: "三组小组长", name: "杨萌", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
-      { role: "四组小组长", name: "吴明慧", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
-      { role: "五组小组长", name: "郑雨嘉", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "四组小组长", name: "杨骐羽", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "五组小组长", name: "康寇佳琦", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
       { role: "六组小组长", name: "柴丽欣", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
-      { role: "七组小组长", name: "沈杜晨希", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
-      { role: "八组小组长", name: "康寇佳琦", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "七组小组长", name: "吴明慧", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
+      { role: "八组小组长", name: "沈杜晨希", duty: "小组学习、生活、卫生、纪律、作业、背书及两操、集队的管理与监督" },
     ] },
     { dept: "houqin", name: "后勤部", brief: "劳动、生活、医务与安全，保障班级日常运转。", members: [
       { role: "劳动部部长（劳动委员）", name: "邹奕宁", duty: "组织班级劳动活动；安排班级轮值表及分工，监督每日劳动并检查；评选劳动之星" },
@@ -249,6 +267,77 @@ const STORE = (function () {
       logAction("自动同步班委标签", "按《班委职责表》自动补齐/纠正学生部门职务");
     }
     return changed;
+  }
+
+  // 只重建小组数据（groups 列表 + 各学生 groupId），不影响积分/密码/兑换等其它数据。
+  // 每次名单改动 GROUP_VERSION +1；版本一致则跳过。远程且已登录时会把重建结果推回服务端。
+  function rebuildGroupsFromList() {
+    if (lsGet(KEY.groupsVer, "") === GROUP_VERSION) return false; // 已按当前名单应用过
+    const users = getUsers();
+    if (!Array.isArray(users) || !users.length) return false;
+    const byName = {};
+    users.forEach((u) => { if (u) byName[u.name] = u; });
+    // 先清空旧组号，避免名单外的残留归属
+    users.forEach((u) => { if (u) u.groupId = ""; });
+    const groups = GROUP_LIST.map((g, i) => {
+      const id = "grp-" + (i + 1);
+      const lead = byName[g.leader];
+      if (lead) { lead.groupId = id; }
+      const members = g.members
+        .map((mn) => { const u = byName[mn]; if (u) { u.groupId = id; return { id: u.id, name: u.name }; } return null; })
+        .filter(Boolean);
+      return { id, name: "第" + (i + 1) + "组", leaderId: lead ? lead.id : null, leaderName: g.leader, members, note: "组长：" + g.leader };
+    });
+    saveGroups(groups);   // 全量覆盖小组（远程有 token 时推服务端）
+    saveUsers(users);     // 同步各学生 groupId（远程有 token 时推服务端）
+    // 远程未登录时先不标记，待已登录的会话补齐服务端后再标记，避免漏推线上
+    if (!isRemote() || apiToken()) {
+      lsSet(KEY.groupsVer, GROUP_VERSION);
+      logAction("更新分组", "按核对名单重建小组（" + groups.length + " 组，每组首位为组长）");
+    }
+    return true;
+  }
+
+  // 教师名单增量同步（幂等）：以 data/teachers.json 为准，
+  // 同一科目的老师实名/账号有变则更新（如道法 王老师 → 王钰），缺失科目则追加新教师；
+  // 只增改教师用户，不动积分/密码/学生。T_VERSION 变化才执行一次。
+  async function syncTeachersFromJson() {
+    if (lsGet(KEY.teachersVer, "") === T_VERSION) return;
+    const users = getUsers();
+    if (!Array.isArray(users) || !users.length) return;
+    let json;
+    try { json = await fetch("data/teachers.json").then((r) => r.json()); } catch (e) { return; }
+    if (!Array.isArray(json)) return;
+    const defHash = await hashPassword(DEFAULT_PWD);
+    const bySubject = {};
+    users.filter((u) => u && u.role === "teacher").forEach((u) => { bySubject[u.subject] = u; });
+    let changed = false;
+    json.forEach((t) => {
+      const cur = bySubject[t.subject];
+      if (cur) {
+        // 同科目实名/账号变更（幂等更新）
+        if (cur.name !== t.name || cur.account !== t.account) {
+          cur.name = t.name; cur.account = t.account; changed = true;
+        }
+      } else {
+        // 新科目老师追加（不覆盖既有 id 规则，用时间戳 id 防冲突）
+        users.push({
+          id: "tea-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+          name: t.name, account: t.account, password: defHash,
+          role: "teacher", subject: t.subject, score: 0,
+          nickname: "", nickPending: "", avatar: "", department: "", departmentRole: "", posts: [],
+          contact: { qq: "", email: "", phone: "" }, bio: "", personalImages: [], badges: [],
+          groupId: "", mustChange: true,
+        });
+        changed = true;
+      }
+    });
+    if (changed) {
+      try { saveUsers(users); } catch (e) { return; }
+      logAction("同步教师名单", "按 data/teachers.json 更新教师实名/科目，新增 " + (json.length - Object.keys(bySubject).length) + " 位老师");
+    }
+    // 只有成功写入（或有 token 会推送）才标记，避免反复尝试
+    if (!isRemote() || apiToken()) lsSet(KEY.teachersVer, T_VERSION);
   }
 
   // 某用户在指定部门的职务（多职务 posts 优先，回退旧单职务字段）
@@ -518,6 +607,10 @@ const STORE = (function () {
       await resyncDocs();
       // 服务端旧数据可能缺多职务字段：合并后自动按班委表补齐职务标签（幂等，有变化才推回服务端）
       autoApplyCommittee();
+      // 核对后分组名单版本变化时，只重建小组数据并推回服务端（不动积分/密码）
+      rebuildGroupsFromList();
+      // 教师名单增量同步（道法王钰 / 新增物理王老师等）
+      await syncTeachersFromJson();
       return;
     }
     // 版本迁移：种子结构变化时，清除旧数据重新初始化
@@ -532,7 +625,7 @@ const STORE = (function () {
       localStorage.setItem(KEY.seedVer, String(SEED_VERSION));
     }
     // 已有数据：仅做多职务增量迁移（幂等），不重新初始化
-    if (lsGet(KEY.users, null)) { backfillUserPosts(); return; }
+    if (lsGet(KEY.users, null)) { backfillUserPosts(); rebuildGroupsFromList(); await syncTeachersFromJson(); return; }
     const [students, teachers] = await Promise.all([
       fetch("data/students.json").then((r) => r.json()),
       fetch("data/teachers.json").then((r) => r.json()),
@@ -607,16 +700,8 @@ const STORE = (function () {
     lsSet(KEY.orders, []);
     lsSet(KEY.cashouts, []);
 
-    // 小组：来自《7.1班分组.xlsx》核对后分组（仅第一~七组，第八组以表为准暂不导入）
-    const groupData = [
-      { leader: "柴丽欣",   members: ["何汶锦", "刘慕辰", "陈劲豪", "周廷翰", "赵晨雅", "汤程杰"] },
-      { leader: "李张涵",   members: ["李雨婷", "郑翀", "张芝清", "谢沂萱", "李文芳"] },
-      { leader: "李欣桐",   members: ["孙明远", "吴优", "梁书宁", "韦尚轩", "马睿瞳", "吴亦翾"] },
-      { leader: "李俊娴",   members: ["吴明慧", "洪晨竣", "付楚珵", "邹奕宁", "郑雨嘉"] },
-      { leader: "杨骐羽",   members: ["王翼航", "杨萌", "杨雯瑶", "赵翌旭", "杨馨", "杨天泽"] },
-      { leader: "康寇佳琦", members: ["王煜滢", "单立安", "陈天和", "李静苒", "焦柔溪", "宋晟睿"] },
-      { leader: "闫熙曼",   members: ["徐开萍", "许文昊", "云健凌", "何兆轩", "徐立凡", "关茗心"] },
-    ];
+    // 小组：使用共享分组名单（核对后，每组首位为组长）
+    const groupData = GROUP_LIST;
     const groups = groupData.map((g, i) => {
       const id = "grp-" + (i + 1);
       const lead = users.find((u) => u.name === g.leader);
@@ -708,16 +793,8 @@ const STORE = (function () {
       const n = String(i).padStart(2, "0");
       photos.push({ src: "image/class/" + n + ".jpg", caption: "班级掠影", status: "published" });
     }
-    // 小组：与本地种子一致
-    const groupData = [
-      { leader: "柴丽欣",   members: ["何汶锦", "刘慕辰", "陈劲豪", "周廷翰", "赵晨雅", "汤程杰"] },
-      { leader: "李张涵",   members: ["李雨婷", "郑翀", "张芝清", "谢沂萱", "李文芳"] },
-      { leader: "李欣桐",   members: ["孙明远", "吴优", "梁书宁", "韦尚轩", "马睿瞳", "吴亦翾"] },
-      { leader: "李俊娴",   members: ["吴明慧", "洪晨竣", "付楚珵", "邹奕宁", "郑雨嘉"] },
-      { leader: "杨骐羽",   members: ["王翼航", "杨萌", "杨雯瑶", "赵翌旭", "杨馨", "杨天泽"] },
-      { leader: "康寇佳琦", members: ["王煜滢", "单立安", "陈天和", "李静苒", "焦柔溪", "宋晟睿"] },
-      { leader: "闫熙曼",   members: ["徐开萍", "许文昊", "云健凌", "何兆轩", "徐立凡", "关茗心"] },
-    ];
+    // 小组：与本地种子一致（使用共享分组名单，每组首位为组长）
+    const groupData = GROUP_LIST;
     const groups = groupData.map((g, i) => {
       const id = "grp-" + (i + 1);
       const lead = users.find((u) => u.name === g.leader);
@@ -969,10 +1046,15 @@ const STORE = (function () {
     const s = actorOverride ? { name: actorOverride, role: "", rank: -1 } : getSession();
     if (!s) return;
     const logs = lsGet(KEY.logs, []);
+    let page = "";
+    try { page = (location.pathname.split("/").pop() || "index.html") + location.search; } catch (e) {}
+    let ua = "";
+    try { ua = String(navigator.userAgent || "").slice(0, 160); } catch (e) {}
     logs.push({
       id: uid("log"), ts: now(),
       operator: s.name, operatorRole: s.role || "", operatorRank: typeof s.rank === "number" ? s.rank : roleRank(s.role),
       action: action || "操作", detail: detail || "",
+      page, ua, device: /Mobile|Android|iPhone|iPad/i.test(ua) ? "移动端" : "桌面端",
     });
     if (logs.length > 2000) logs.splice(0, logs.length - 2000);
     lsSet(KEY.logs, logs);
@@ -2161,6 +2243,7 @@ const STORE = (function () {
       week: useWeek, date: useDate, memberId, memberName: u.name, task: t, ts: now(),
     });
     lsSet(KEY.duty, list.sort((a, b) => String(a.date).localeCompare(String(b.date))));
+    logAction("组长安排值日", g.name + " → " + u.name + "：" + t + (useWeek ? "（每周周" + useWeek + "循环）" : "（" + useDate + "）"));
     return { ok: true };
   }
   // 组长/超管删除本组某条值日分工
@@ -2169,6 +2252,7 @@ const STORE = (function () {
     if (!d) return { ok: false, msg: "值日安排不存在" };
     const gate = leaderGate(d.groupId); if (!gate.ok) return gate;
     lsSet(KEY.duty, getDuty().filter((x) => x.id !== id));
+    logAction("删除值日安排", d.groupName + " → " + d.memberName + "：" + d.task);
     return { ok: true };
   }
 
@@ -2193,6 +2277,7 @@ const STORE = (function () {
     u.portrait = url;
     saveUsers(users);
     if (isRemote() && s) pushDocs();
+    logAction("更新班委头像", u.name + "（" + (g ? g.name : "超管代传") + "）");
     return { ok: true, src: url };
   }
 

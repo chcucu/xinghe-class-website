@@ -906,3 +906,104 @@ h1, h2, h3, h4, p, li, blockquote, td, th, span, div { -webkit-text-size-adjust:
 @media (max-width: 480px) {
   .toast { font-size: 13px; padding: 10px 16px; white-space: normal; text-align: center; }
 }
+
+/* ============================================================
+   星河动效系统（高性能 · GPU 友好）
+   原则：只用 transform / opacity 合成，避免布局抖动；
+        JS 仅在 site.js 里挂载一次，全站自动生效。
+   ============================================================ */
+:root {
+  --xh-ease: cubic-bezier(.22, .61, .36, 1);
+  --xh-dur: .62s;
+}
+
+/* 进入 / 滚动显现：仅当 body.xh-anim（JS 确认可用）时才隐藏初态，防 JS 失败白屏 */
+body.xh-anim .xh-rise,
+body.xh-anim .xh-reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  will-change: opacity, transform;
+}
+body.xh-anim .xh-rise.in,
+body.xh-anim .xh-reveal.in {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--xh-dur) var(--xh-ease) var(--xd, 0s),
+              transform var(--xh-dur) var(--xh-ease) var(--xd, 0s);
+}
+
+/* 悬停抬升（卡片/面板） */
+.xh-hover { transition: transform .35s var(--xh-ease), box-shadow .35s var(--xh-ease); }
+.xh-hover:hover { transform: translateY(-6px) scale(1.015); box-shadow: var(--shadow); }
+
+/* 光泽扫过 */
+.xh-sheen { position: relative; overflow: hidden; }
+.xh-sheen::after {
+  content: ""; position: absolute; top: 0; left: -130%;
+  width: 55%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.38), transparent);
+  transform: skewX(-18deg);
+  transition: left .65s var(--xh-ease);
+  pointer-events: none;
+}
+.xh-sheen:hover::after { left: 135%; }
+.page-hero .xh-sheen::after { background: linear-gradient(100deg, transparent, rgba(255,255,255,.14), transparent); }
+
+/* 3D 倾斜卡片（JS 注入 transform） */
+.xh-tilt { transform-style: preserve-3d; transition: transform .18s ease-out; will-change: transform; }
+
+/* 按钮涟漪 */
+.btn { position: relative; overflow: hidden; }
+.xh-rip {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: rgba(255, 255, 255, .55);
+  transform: scale(0); animation: xhRip .52s ease-out forwards;
+}
+.xh-rip-dark { background: rgba(0, 0, 0, .12); }
+@keyframes xhRip { to { transform: scale(2.6); opacity: 0; } }
+
+/* 页面切换（点击站内链接时 body 淡出上移） */
+body.xh-leave {
+  opacity: 0; transform: translateY(-10px);
+  transition: opacity .17s ease, transform .17s ease;
+  pointer-events: none;
+}
+
+/* Hero 氛围光斑（慢速漂移，3D 呼吸感） */
+.page-hero .xh-orb {
+  position: absolute; border-radius: 50%;
+  filter: blur(58px); opacity: .55;
+  pointer-events: none; z-index: 1;
+  animation: xhOrb var(--orb-t, 14s) ease-in-out infinite alternate;
+}
+@keyframes xhOrb {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(34px, 22px) scale(1.14); }
+}
+
+/* 导航悬停下划线（与 macOS 极简呼应） */
+.main-nav a { position: relative; }
+.main-nav a::after {
+  content: ""; position: absolute; left: 14px; right: 14px; bottom: 5px;
+  height: 2px; background: currentColor; opacity: .55;
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .25s var(--xh-ease);
+}
+.main-nav a:hover::after,
+.main-nav a.active::after { transform: scaleX(1); }
+
+/* 离屏渲染优化：不可见内容跳过绘制，滚动到附近再渲染 */
+.container > .panel,
+.info-card, .person-card { content-visibility: auto; contain-intrinsic-size: auto 340px; }
+
+/* 尊重系统「减少动态效果」偏好：全部动画瞬间完成 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  body.xh-anim .xh-rise,
+  body.xh-anim .xh-reveal { opacity: 1; transform: none; }
+}

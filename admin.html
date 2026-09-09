@@ -772,6 +772,8 @@
             <b>${esc(l.operator)}</b> <span class="pc-role" style="font-size:10.5px;">${roleL[l.operatorRole] || l.operatorRole}</span>
             <span style="margin-left:8px;">${esc(l.action)}</span>
             ${l.detail ? '<div class="ri-cost">' + esc(l.detail) + '</div>' : ''}
+            ${(l.page || l.device) ? '<div class="ri-cost muted-note" style="font-size:11.5px;margin-top:2px;">' +
+              [l.page ? '页面：' + esc(l.page) : '', l.device ? l.device : ''].filter(Boolean).join(' · ') + '</div>' : ''}
           </div>
           <div class="ri-cost" style="white-space:nowrap;">${STORE.fmtTime(l.ts)}</div>
         </div>`).join("");
