@@ -42,6 +42,7 @@
   function card(sg) {
     const mine = STORE.mySignup(sg.id);
     const total = sg.responses.length;
+    const canDel = canManage || sg.createBy === s.name || STORE.isSiteAdmin(s);
     const counts = {};
     sg.items.forEach((it) => { counts[it] = sg.responses.filter((r) => r.choice === it).length; });
     return `
@@ -66,7 +67,10 @@
 
         ${mine && mine.note ? `<div class="muted-note">备注：${esc(mine.note)}</div>` : ""}
         ${canManage ? `<div class="muted-note" style="border-top:1px solid var(--line-2);padding-top:8px;font-size:12.5px;"><b>报名名单：</b>${sg.responses.length ? sg.responses.map((r) => esc(r.name) + (r.choice === "参加" || !sg.items.length ? "" : "（" + esc(r.choice) + "）") + (r.note ? "{" + esc(r.note) + "}" : "")).join("、") : "暂无"}</div>` : ""}
-        ${canManage && sg.open ? `<button class="btn btn-sm sg-close" data-sg="${sg.id}" style="align-self:flex-start;margin-top:4px;">截止接龙</button>` : ""}
+        <div style="display:flex;gap:8px;align-items:center;">
+          ${canManage && sg.open ? `<button class="btn btn-sm sg-close" data-sg="${sg.id}">截止接龙</button>` : ""}
+          ${canDel ? `<button class="btn-outline btn-sm sg-del" data-sg="${sg.id}" style="color:#d33;">删除接龙</button>` : ""}
+        </div>
       </div>`;
   }
 
@@ -86,6 +90,14 @@
     if (close) {
       if (!confirm("确定截止该接龙？")) return;
       STORE.closeSignup(close.dataset.sg);
+      render();
+      return;
+    }
+    const del = e.target.closest(".sg-del");
+    if (del) {
+      if (!confirm("确定删除该接龙？删除后不可恢复。")) return;
+      const r = STORE.deleteSignup(del.dataset.sg);
+      alert(r.ok ? "已删除" : r.msg);
       render();
     }
   });

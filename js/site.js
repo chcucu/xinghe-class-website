@@ -92,7 +92,7 @@
         '<span class="us-item us-role">' + roleLabel + '</span>' +
         (s.role === "parent" ? '<a class="us-item us-link" href="archive.html">我的孩子</a>' : "") +
         '<a class="us-item us-link" href="profile.html">用户中心</a>' +
-        (STORE.isSuperAdmin(s.role) ? '<a class="us-item us-link us-admin" href="admin.html">后台</a>' : "") +
+        (STORE.isSiteAdmin(s) ? '<a class="us-item us-link us-admin" href="admin.html">后台</a>' : "") +
         '<button class="us-item us-btn" id="usLogout">退出</button>';
       var btn = document.getElementById("usLogout");
       if (btn) btn.addEventListener("click", function () { STORE.logout(); location.href = "identity.html"; });

@@ -286,7 +286,7 @@
     await STORE.ensureSeeded();
     const s = STORE.getSession();
     if (!s) { location.href = "login.html"; return; }
-    if (!STORE.isSuperAdmin(s.role)) { alert("你没有访问管理后台的权限"); location.href = "bank.html"; return; }
+    if (!STORE.isSiteAdmin(s)) { alert("你没有访问管理后台的权限"); location.href = "bank.html"; return; }
 
     const roleLabel = { admin: "班主任", teacher: "教师", monitor: "班委", superadmin: "超级管理员", student: "学生", parent: "家长", guest: "访客" };
     const roleOrder = { superadmin: 0, admin: 1, teacher: 2, monitor: 3, student: 4, parent: 5, guest: 6 };
@@ -310,7 +310,8 @@
     }));
 
     function avatarHtml(u) {
-      if (u.avatar) return '<span class="admin-avatar"><img src="' + STORE.resolveImg(u.avatar) + '" alt=""></span>';
+      const src = u.portrait ? STORE.resolveImg(u.portrait) : (u.avatar ? STORE.resolveImg(u.avatar) : "");
+      if (src) return '<span class="admin-avatar"><img src="' + src + '" alt=""></span>';
       return '<span class="admin-avatar">' + esc((u.name || "星").charAt(0)) + '</span>';
     }
     function dispName(u) { return u.nickname || u.name; }
@@ -357,6 +358,7 @@
           <td style="white-space:nowrap;">
             <button class="btn-outline" style="padding:5px 10px;font-size:12px;margin-right:5px;" data-reset="${u.id}">重置密码</button>
             <button class="btn-outline" style="padding:5px 10px;font-size:12px;margin-right:5px;" data-editpwd="${u.id}">设密码</button>
+            <button class="btn-outline" style="padding:5px 10px;font-size:12px;margin-right:5px;" data-pt="${u.id}">班委头像</button>
             <button class="btn-outline" style="padding:5px 10px;font-size:12px;" data-edit="${u.id}">编辑资料</button>
           </td>
         </tr>`;
@@ -409,9 +411,46 @@
       document.querySelectorAll("[data-editpwd]").forEach((btn) => {
         btn.addEventListener("click", () => openPwdModal(btn.dataset.editpwd));
       });
+      // 上传班委头像（用户管理）
+      document.querySelectorAll("[data-pt]").forEach((btn) => {
+        btn.addEventListener("click", () => openPortraitModal(btn.dataset.pt));
+      });
       // 编辑资料（姓名/昵称/头像）
       document.querySelectorAll("[data-edit]").forEach((btn) => {
         btn.addEventListener("click", () => openProfileModal(btn.dataset.edit));
+      });
+    }
+
+    // 班委头像上传弹窗（管理员代传）
+    function openPortraitModal(uid) {
+      const u = STORE.getUsers().find((x) => x.id === uid);
+      if (!u) return;
+      let av = u.portrait || "";
+      const prevHtml = () => av
+        ? '<img src="' + STORE.resolveImg(av) + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:1px solid var(--line-2);">'
+        : '<span style="width:80px;height:80px;border-radius:50%;display:inline-grid;place-items:center;background:var(--bg);color:var(--muted);border:1px solid var(--line-2);font-size:26px;">' + esc((u.name || "星").charAt(0)) + "</span>";
+      openModal("上传班委头像", esc(u.name) + " · 头像将展示在班委风采、班级介绍与值日表中。",
+        '<div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;"><div id="ptPrev">' + prevHtml() + "</div>" +
+        '<input type="file" id="ptFile" accept="image/*" style="display:none;">' +
+        '<div style="display:flex;flex-direction:column;gap:6px;">' +
+        '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" id="ptPick">选择图片</button>' +
+        '<button class="btn-outline" style="padding:6px 12px;font-size:12.5px;" id="ptClear">清除头像</button></div></div>' +
+        '<p class="muted-note" style="font-size:12px;">支持 jpg/png，自动压缩至 400px。</p>',
+        "保存", async () => {
+          const r = await STORE.adminSetPortrait(uid, av);
+          alert(r.ok ? "班委头像已保存" : r.msg);
+          if (r.ok) { closeModal(); renderUsers(); }
+        });
+      document.getElementById("ptPick").addEventListener("click", () => document.getElementById("ptFile").click());
+      document.getElementById("ptFile").addEventListener("change", (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        readImage(f, (dataUrl) => { av = dataUrl; document.getElementById("ptPrev").innerHTML = prevHtml(); });
+      });
+      document.getElementById("ptClear").addEventListener("click", async () => {
+        const r = await STORE.adminSetPortrait(uid, "");
+        alert(r.ok ? "已清除班委头像" : r.msg);
+        if (r.ok) { closeModal(); renderUsers(); }
       });
     }
 
@@ -740,8 +779,10 @@
         <div class="redeem-item">
           <div class="ri-body"><b>${esc(v.title)}</b><div class="ri-cost">${v.responses.length} 人已投${v.open ? " · 进行中" : " · 已结束"}</div></div>
           ${v.open ? '<button class="btn-outline" data-cls="' + v.id + '" style="padding:6px 12px;font-size:12.5px;">结束</button>' : ""}
+          <button class="btn-outline" data-delv="' + v.id + '" style="padding:6px 12px;font-size:12.5px;color:#d33;">删除</button>
         </div>`).join("");
       document.querySelectorAll("[data-cls]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认结束？")) return; STORE.closeVote(b.dataset.cls); renderAdminVotes(); }));
+      document.querySelectorAll("[data-delv]").forEach((b) => b.addEventListener("click", () => { if (!confirm("确认删除该投票？")) return; const r = STORE.deleteVote(b.dataset.delv); alert(r.ok ? "已删除" : r.msg); renderAdminVotes(); }));
     }
     document.getElementById("btnAdmCreateVote").addEventListener("click", () => {
       const title = document.getElementById("admVtTitle").value.trim();

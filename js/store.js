@@ -1032,6 +1032,16 @@ const STORE = (function () {
   function canEditRole(role) { return ["teacher", "admin", "monitor", "superadmin"].includes(role); }
   // 超级管理员（可进后台）：admin（班主任）与 superadmin（系统超管）
   function isSuperAdmin(role) { return role === "admin" || role === "superadmin"; }
+  // 网站管理员（管理网站内容）：超管 或 信息安全部部长
+  function isSiteAdmin(s) {
+    if (!s) return false;
+    if (isSuperAdmin(s.role)) return true;
+    try {
+      const u = getUsers().find((x) => x.id === s.id);
+      if (u && Array.isArray(u.posts) && u.posts.some((p) => p.dept === "xinxianquan" && p.role === "minister")) return true;
+    } catch (e) {}
+    return false;
+  }
   // 管理员级别（用于操作日志查看权限）：超管=3 班主任=2 教师/班委=1 其余=0
   function roleRank(role) {
     if (role === "superadmin") return 3;
@@ -1609,13 +1619,13 @@ const STORE = (function () {
   function getNews() { return lsGet(KEY.news, []); }
   function saveNews(list) {
     const op = getSession();
-    if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    if (!op || !isSiteAdmin(op)) return { ok: false, msg: "无权限" };
     lsSet(KEY.news, list);
     return { ok: true };
   }
   function addNews(item) {
     const op = getSession();
-    if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    if (!op || !isSiteAdmin(op)) return { ok: false, msg: "无权限" };
     if (!item || !item.title || !item.content) return { ok: false, msg: "标题与内容不能为空" };
     const list = getNews();
     list.unshift({ id: uid("news"), title: item.title, content: item.content, date: item.date || now(), ts: now() });
@@ -1625,7 +1635,7 @@ const STORE = (function () {
   }
   function deleteNews(id) {
     const op = getSession();
-    if (!op || !isSuperAdmin(op.role)) return { ok: false, msg: "无权限" };
+    if (!op || !isSiteAdmin(op)) return { ok: false, msg: "无权限" };
     const target = getNews().find((n) => n.id === id);
     lsSet(KEY.news, getNews().filter((n) => n.id !== id));
     logAction("删除班级新闻", target ? "「" + target.title + "」" : id);
@@ -1981,7 +1991,7 @@ const STORE = (function () {
   function galleryCanManage(photo) {
     const s = getSession();
     if (!s) return false;
-    if (isSuperAdmin(s.role) || s.role === "admin") return true;
+    if (isSiteAdmin(s)) return true;
     return !!(photo && photo.uploaderId === s.id);
   }
   function galleryRename(photoId, newName) {
@@ -2009,7 +2019,7 @@ const STORE = (function () {
   function galleryDeleteAlbum(albumId) {
     const s = getSession();
     if (!s) return { ok: false, msg: "请先登录" };
-    if (!(isSuperAdmin(s.role) || s.role === "admin")) return { ok: false, msg: "仅管理员可删除相册" };
+    if (!isSiteAdmin(s)) return { ok: false, msg: "仅网站管理员可删除相册" };
     const g = galleryGet();
     const target = g.albums.find((a) => a.id === albumId);
     g.albums = g.albums.filter((a) => a.id !== albumId);
@@ -2025,7 +2035,7 @@ const STORE = (function () {
   function getNotices() { return lsGet(KEY.notices, []); }
   function addNotice(title, content) {
     const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
-    if (!isSuperAdmin(s.role)) return { ok: false, msg: "仅班主任/超管可发布通知" };
+    if (!isSiteAdmin(s)) return { ok: false, msg: "仅网站管理员可发布通知" };
     if (!title || !content) return { ok: false, msg: "标题与内容不能为空" };
     const list = getNotices();
     list.unshift({ id: uid("nt"), title, content, author: s.name, ts: now() });
@@ -2035,7 +2045,7 @@ const STORE = (function () {
   }
   function updateNotice(id, title, content) {
     const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
-    if (!isSuperAdmin(s.role)) return { ok: false, msg: "仅班主任/超管可编辑公告" };
+    if (!isSiteAdmin(s)) return { ok: false, msg: "仅网站管理员可编辑公告" };
     if (!id || !title || !content) return { ok: false, msg: "标题与内容不能为空" };
     const list = getNotices();
     const n = list.find((x) => x.id === id);
@@ -2046,7 +2056,7 @@ const STORE = (function () {
     return { ok: true, list };
   }
   function deleteNotice(id) {
-    if (!isSuperAdmin(getSession()?.role)) return { ok: false, msg: "无权限" };
+    if (!isSiteAdmin(getSession())) return { ok: false, msg: "无权限" };
     const target = getNotices().find((n) => n.id === id);
     lsSet(KEY.notices, getNotices().filter((n) => n.id !== id));
     logAction("删除通知公告", target ? "「" + target.title + "」" : id);
@@ -2281,6 +2291,23 @@ const STORE = (function () {
     return { ok: true, src: url };
   }
 
+  // 管理员在「用户管理」上传/更换班委头像（网站管理员可用，上传即生效）
+  async function adminSetPortrait(uid, dataUrl) {
+    const s = getSession(); if (!s) return { ok: false, msg: "请先登录" };
+    if (!isSiteAdmin(s)) return { ok: false, msg: "仅网站管理员可上传班委头像" };
+    // 空串表示清除头像
+    if (dataUrl && !isImgSrc(dataUrl)) return { ok: false, msg: "图片无效" };
+    const url = dataUrl ? await uploadImg(dataUrl, "jpg") : "";
+    const users = getUsers();
+    const u = users.find((x) => x.id === uid);
+    if (!u) return { ok: false, msg: "用户不存在" };
+    u.portrait = url;
+    saveUsers(users);
+    if (isRemote() && s) pushDocs();
+    logAction(url ? "更新班委头像" : "清除班委头像", u.name + "（用户管理 · 网站管理员）");
+    return { ok: true, src: url };
+  }
+
   // 小组积分统计（组长+组员）
   function groupStats() {
     const users = getUsers();
@@ -2371,12 +2398,23 @@ const STORE = (function () {
   }
   function closeVote(id) {
     const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
-    if (!canManageVotes(s.role)) return { ok: false, msg: "无权限" };
+    if (!canManageVotes(s.role) && !isSiteAdmin(s)) return { ok: false, msg: "无权限" };
     const list = getVotes();
     const v = list.find((x) => x.id === id);
     if (v) v.open = false;
     saveVotes(list);
     logAction("结束投票", v ? "「" + v.title + "」" : id);
+    return { ok: true };
+  }
+  // 删除投票（发起人或可管理人员）
+  function deleteVote(id) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    const list = getVotes();
+    const v = list.find((x) => x.id === id);
+    if (!v) return { ok: false, msg: "投票不存在" };
+    if (v.createBy !== s.name && !canManageVotes(s.role) && !isSiteAdmin(s)) return { ok: false, msg: "仅发起人或班委/超管可删除" };
+    saveVotes(list.filter((x) => x.id !== id));
+    logAction("删除投票", "「" + v.title + "」");
     return { ok: true };
   }
   function myVote(voteId) {
@@ -2578,10 +2616,20 @@ const STORE = (function () {
     return sg ? sg.responses.find((r) => r.uid === s.id) || null : null;
   }
   function closeSignup(id) {
-    const s = getSession(); if (!s || !canManageSignup(s.role)) return { ok: false, msg: "无权限" };
+    const s = getSession(); if (!s || (!canManageSignup(s.role) && !isSiteAdmin(s))) return { ok: false, msg: "无权限" };
     const list = getSignups(); const sg = list.find((x) => x.id === id);
     if (sg) sg.open = false;
     lsSet(KEY.signups, list); return { ok: true };
+  }
+  // 删除接龙（发起人或可管理人员）
+  function deleteSignup(id) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    const list = getSignups(); const sg = list.find((x) => x.id === id);
+    if (!sg) return { ok: false, msg: "接龙不存在" };
+    if (sg.createBy !== s.name && !canManageSignup(s.role) && !isSiteAdmin(s)) return { ok: false, msg: "仅发起人或班委/老师可删除" };
+    lsSet(KEY.signups, list.filter((x) => x.id !== id));
+    logAction("删除接龙", "「" + sg.title + "」");
+    return { ok: true };
   }
 
   /* ============================================================
@@ -2747,7 +2795,10 @@ const STORE = (function () {
     register, pendingRegistrations, reviewRegister, myChild,
     getSession, findById, findByAccount,
     leaderboard, displayName,
-    canEditRole, isSuperAdmin,
+    canEditRole, isSuperAdmin, isSiteAdmin, roleRank,
+    adminSetPassword, adminGetPwdStatus, adminUpdateProfile,
+    adminAddPost, adminRemovePost, adminSetPosts, adminApplyCommittee,
+    setMemberPortrait, adminSetPortrait,
     applyDelta, undoLast,
     applyRedeem, reviewRedeem, offlineDeduct,
     getLedger, getRedeems, getMeta, getUsers,
@@ -2774,13 +2825,13 @@ const STORE = (function () {
     myGroup, myGroupAsLeader, groupLeaderAddMember, groupLeaderRemoveMember,
     groupDutyAssign, deleteGroupDuty, setMemberPortrait,
     getWall, postWall, deleteWall,
-    getVotes, createVote, castVote, closeVote, myVote, canManageVotes,
+    getVotes, createVote, castVote, closeVote, deleteVote, myVote, canManageVotes,
     archive,
     periodStart, rankPeriod, groupRank, batchApplyDelta,
     getStars, setStar, currentStar, revokeStar,
     getWishes, myWishes, addWish, toggleWish, deleteWish,
     timeline,
-    getSignups, createSignup, signupRespond, mySignup, closeSignup, canManageSignup,
+    getSignups, createSignup, signupRespond, mySignup, closeSignup, deleteSignup, canManageSignup,
     getLicenses, getProducts, userLicense, approvedLicense, canPublish,
     applyLicense, reviewLicense,
     publishProduct, reviewProduct, deleteProduct, publishedProducts, myProducts, myLicense,

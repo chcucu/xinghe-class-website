@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
-  <meta name="description" content="星河班 · 小组 —— 组长管理组员、安排值日分工、上传班委头像">
+  <meta name="description" content="星河班 · 小组 —— 组长管理组员、安排值日分工、查看组员风采">
   <title>小组 · 星河班</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -42,7 +42,6 @@
       <h3 id="grpTitle">我的小组</h3>
       <div class="toolbar" style="justify-content:space-between;margin-bottom:12px;" id="grpMemberBar"></div>
       <div id="grpMemberList"></div>
-      <input type="file" id="filePortrait" accept="image/*" style="display:none;">
     </div>
 
     <!-- 值日安排（组长面板） -->
@@ -132,38 +131,7 @@
     let myGrp = STORE.myGroup() || STORE.myGroupAsLeader() || null;
     const isLead = !!(STORE.myGroupAsLeader() || (s.role && (s.role === "admin" || s.role === "superadmin")));
 
-    // 组员上传头像（压缩为 400px 真实图）
-    let pendingPortrait = null;
-    function pickPortrait(groupId, memberId, name) {
-      pendingPortrait = { groupId, memberId, name };
-      document.getElementById("filePortrait").click();
-    }
-    function compressImage(file, cb) {
-      const fr = new FileReader();
-      fr.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          let w = img.width, h = img.height;
-          const MAX = 600;
-          if (w > MAX || h > MAX) { const k = Math.min(MAX / w, MAX / h); w = Math.round(w * k); h = Math.round(h * k); }
-          const c = document.createElement("canvas"); c.width = w; c.height = h;
-          c.getContext("2d").drawImage(img, 0, 0, w, h);
-          cb(c.toDataURL("image/jpeg", 0.88));
-        };
-        img.src = fr.result;
-      };
-      fr.readAsDataURL(file);
-    }
-    document.getElementById("filePortrait").addEventListener("change", async (e) => {
-      const f = e.target.files[0];
-      if (!f || !pendingPortrait) return;
-      const p = pendingPortrait; pendingPortrait = null;
-      compressImage(f, async (dataUrl) => {
-        const r = await STORE.setMemberPortrait(p.groupId, p.memberId, dataUrl);
-        alert(r.ok ? "班委头像已更新（上传即生效）" : r.msg);
-        renderMembers();
-      });
-    });
+    // 班委头像已移至「用户管理」由网站管理员统一维护（小组页仅展示）
 
     function renderMembers() {
       myGrp = STORE.myGroup() || STORE.myGroupAsLeader() || null;
@@ -221,18 +189,11 @@
           portraitHtml(mid, u.name) +
           '<div style="flex:1;min-width:0;">' +
           '<b>' + esc(u.nickname || u.name) + '</b>' + (isLeader ? ' <span class="pwd-tag" style="color:#b8860b;border-color:#e5c06f;">组长</span>' : "") +
-          '<div class="hint" style="font-size:12.5px;color:var(--muted);">' + esc(u.name) +
-          (u.portrait ? ' <span style="color:#2a9d3f;">· 已上传班委头像</span>' : ' · 未上传班委头像') + '</div></div>' +
-          (isLead ? '<input type="file" accept="image/*" style="display:none;" data-pu="' + mid + '" title="上传班委头像">' +
-            '<button class="btn-outline" style="padding:5px 10px;font-size:12px;" data-pick="' + mid + '">' + (u.portrait ? "更换班委头像" : "上传班委头像") + '</button>' : "") +
+          '<div class="hint" style="font-size:12.5px;color:var(--muted);">' + esc(u.name) + '</div></div>' +
           (isLead && !isLeader ? '<button class="btn-outline" style="padding:5px 10px;font-size:12px;color:#d33;" data-kick="' + mid + '">剔除</button>' : "") +
           '</div>';
       }).join("") || '<p class="muted-note">本组暂无可显示成员。</p>';
 
-      // 头像挑选
-      document.querySelectorAll("[data-pick]").forEach((b) => {
-        b.addEventListener("click", () => pickPortrait(g.id, b.dataset.pick));
-      });
       // 剔除（带理由）
       document.querySelectorAll("[data-kick]").forEach((b) => {
         b.addEventListener("click", () => {

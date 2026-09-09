@@ -20,7 +20,7 @@
     <a href="profile.html" style="font-size:13.5px;color:var(--text-soft);">个人中心</a>
     <span class="u-name">${esc(session.name)}</span>
     <span class="u-role">${roleLabel}</span>
-    ${["admin", "superadmin"].includes(role) ? '<a href="admin.html" style="font-size:13.5px;color:#0a0a0a;font-weight:600;">管理后台</a>' : ""}
+    ${STORE.isSiteAdmin(session) ? '<a href="admin.html" style="font-size:13.5px;color:#0a0a0a;font-weight:600;">管理后台</a>' : ""}
     <button id="btnLogout">退出</button>
   `;
   document.getElementById("btnLogout").addEventListener("click", () => {

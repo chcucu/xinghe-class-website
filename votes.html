@@ -101,7 +101,7 @@
 
     function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
-    if (STORE.isSuperAdmin(s.role)) document.getElementById("voteAdminLink").style.display = "";
+    if (STORE.isSiteAdmin(s)) document.getElementById("voteAdminLink").style.display = "";
     if (canManage) {
       document.getElementById("voteCreatePanel").style.display = "block";
       document.getElementById("votePrompt").textContent = "你可以发起投票：";
@@ -137,9 +137,11 @@
         }).join("");
 
         const status = ended ? '<span class="pc-role">已结束</span>' : (voted ? '<span class="pc-role">你已投票</span>' : '<span class="pc-role">进行中</span>');
+        const canDel = canManage || v.createBy === s.name || STORE.isSiteAdmin(s);
         const actions = (!voted && !ended && canVote)
           ? `<button class="btn btn-block" data-vote="${v.id}" data-multi="${v.allowMulti}" style="max-width:180px;">提交票</button>`
           : (canManage && !ended ? `<button class="btn-outline" data-close="${v.id}" style="padding:6px 12px;font-size:12.5px;">结束投票</button>` : "");
+        const delBtn = canDel ? `<button class="btn-outline" data-delv="${v.id}" style="padding:6px 12px;font-size:12.5px;color:#d33;">删除</button>` : "";
 
         return `
         <div class="panel" style="margin-bottom:18px;">
@@ -151,8 +153,8 @@
           </div>
           ${rows}
           ${actions}
-        </div>`;
-      }).join("");
+          ${delBtn}
+        </div>`).join("");
 
       box.querySelectorAll("[data-vote]").forEach((b) => {
         b.addEventListener("click", function () {
@@ -167,6 +169,9 @@
       });
       box.querySelectorAll("[data-close]").forEach((b) => {
         b.addEventListener("click", () => { if (!confirm("确认结束该投票？")) return; STORE.closeVote(b.dataset.close); render(); });
+      });
+      box.querySelectorAll("[data-delv]").forEach((b) => {
+        b.addEventListener("click", () => { if (!confirm("确认删除该投票？删除后不可恢复。")) return; const r = STORE.deleteVote(b.dataset.delv); alert(r.ok ? "已删除" : r.msg); render(); });
       });
     }
 
