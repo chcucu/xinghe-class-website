@@ -1007,3 +1007,43 @@ body.xh-leave {
   body.xh-anim .xh-rise,
   body.xh-anim .xh-reveal { opacity: 1; transform: none; }
 }
+
+/* ============================================================
+   动效深化（第二批 · 转场遮罩 / 滚动进度 / 按压 / 3D 相册）
+   ============================================================ */
+/* 页面切换遮罩：黑色圆环从中心展开吞没旧页（高感官 3D 转场） */
+.xh-veil {
+  position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  background: #000;
+  clip-path: circle(0% at 50% 50%);
+  will-change: clip-path;
+}
+body.xh-leave .xh-veil { animation: xhVeil .36s var(--xh-ease) forwards; }
+@keyframes xhVeil {
+  0%   { clip-path: circle(0% at 50% 50%); }
+  62%  { clip-path: circle(118% at 50% 50%); }
+  100% { clip-path: circle(118% at 50% 50%); }
+}
+
+/* 顶部阅读进度条（细黑线，macOS 极简） */
+.xh-progress {
+  position: fixed; top: 0; left: 0; height: 2px; width: 100%;
+  background: linear-gradient(90deg, #000, #666);
+  transform: scaleX(0); transform-origin: left;
+  z-index: 9998; pointer-events: none;
+  will-change: transform;
+}
+
+/* 按钮按压反馈 */
+.btn:active { transform: scale(.96); }
+
+/* 相册缩略图 3D 翻转 hover（仅图形，无布局抖动） */
+.gallery-grid a { position: relative; display: block; }
+.gallery-grid a img {
+  transition: transform .5s var(--xh-ease), box-shadow .5s var(--xh-ease);
+  will-change: transform;
+}
+.gallery-grid a:hover img {
+  transform: rotateY(7deg) rotateX(2.5deg) scale(1.05);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .16);
+}

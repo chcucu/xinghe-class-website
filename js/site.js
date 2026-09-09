@@ -280,7 +280,7 @@
       });
     }
 
-    // ---- 页面切换：点站内链接先淡出再跳转（排除外链/新窗/锚点/脚本） ----
+    // ---- 页面切换：黑色圆环遮罩吞没旧页后跳转（排除外链/新窗/锚点/脚本） ----
     function initPageLeave() {
       if (reduced) return;
       document.addEventListener("click", function (e) {
@@ -294,9 +294,59 @@
         e.preventDefault();
         var done = false;
         function go() { if (done) return; done = true; location.href = a.href; }
+        var veil = document.createElement("div");
+        veil.className = "xh-veil";
+        document.body.appendChild(veil);
         document.body.classList.add("xh-leave");
-        setTimeout(go, 170);
+        setTimeout(go, 380); // 等圆环遮罩展开动画完成
       });
+    }
+
+    // ---- 顶部阅读进度条（scroll 用 rAF 节流，零布局开销） ----
+    function initScrollProgress() {
+      if (reduced) return;
+      var bar = document.createElement("div");
+      bar.className = "xh-progress";
+      document.body.appendChild(bar);
+      var ticking = false;
+      function update() {
+        ticking = false;
+        var doc = document.documentElement;
+        var max = doc.scrollHeight - window.innerHeight;
+        var p = max > 0 ? window.scrollY / max : 0;
+        bar.style.transform = "scaleX(" + Math.min(1, Math.max(0, p)).toFixed(4) + ")";
+      }
+      window.addEventListener("scroll", function () {
+        if (!ticking) { ticking = true; requestAnimationFrame(update); }
+      }, { passive: true });
+      update();
+    }
+
+    // ---- 数字滚动（.xh-count[data-count]，进入视口后从 0 滚动到目标值） ----
+    function initCounters() {
+      if (reduced || !("IntersectionObserver" in window)) return;
+      var els = qsa(".xh-count[data-count]");
+      if (!els.length) return;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          io.unobserve(en.target);
+          var el = en.target;
+          var target = parseFloat(el.getAttribute("data-count") || "0") || 0;
+          var suffix = (el.textContent || "").replace(/[\d.,\s]+/g, ""); // 保留单位等尾缀
+          var dur = 950, t0 = null;
+          function step(t) {
+            if (!t0) t0 = t;
+            var p = Math.min((t - t0) / dur, 1);
+            var val = Math.round(target * (1 - Math.pow(1 - p, 3)));
+            el.textContent = String(val) + suffix;
+            if (p < 1) requestAnimationFrame(step);
+            else el.textContent = String(target) + suffix;
+          }
+          requestAnimationFrame(step);
+        });
+      }, { threshold: 0.5 });
+      els.forEach(function (el) { io.observe(el); });
     }
 
     // ---- 图片懒加载 + 异步解码（首屏/Logo 除外；动态渲染的图也会自动补齐） ----
@@ -331,6 +381,8 @@
       initOrbs();
       initRipple();
       initPageLeave();
+      initScrollProgress();
+      initCounters();
       initLazyImgs();
     }
     if (document.readyState === "loading") {
