@@ -1153,3 +1153,48 @@ body.xh-leave .xh-veil { animation: xhVeil .36s var(--xh-ease) forwards; }
   .page-hero { padding: 30px 0 22px; }
   .hero-card, .stat-card { padding: 14px; }
 }
+
+/* ============================================================
+   移动端终极兜底：确保「任何设备、任意页面」不横向破版
+   原则：表格在 960 内横向滚动、超长串强制断行、flex/网格子项可收缩。
+   放在文件末尾以保证覆盖先前规则，且不与已有应的响应式冲突。
+   ============================================================ */
+
+/* 601–960px：平板横屏 / 折叠屏（窄于桌面）也启用表格横向滚动，避免大表格撑宽 */
+@media (max-width: 960px) {
+  /* 表格元素需块级化后 overflow 才生效 —— 仅在此区间补 display:block（600 内已有） */
+  .admin-table, .data-table, .tbl, .rank-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* 包裹容器：overflow 直接生效 */
+  .table-wrap, .rank-table-wrap, .orders-table, .mod-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* ≤600px：手机端终极防护 */
+@media (max-width: 600px) {
+  /* 超长不可断串（并列名单 / URL / 学号 / 英文单词）强制断行，杜绝横向破版 */
+  p, li, dd, td, th, span, a, b, strong, h1, h2, h3, h4, blockquote {
+    overflow-wrap: break-word; word-wrap: break-word;
+  }
+
+  /* flex 工具条 / 标签页子项默认可收缩，避免被不换行内容（如较长下拉）撑宽 */
+  .toolbar, .admin-tabs, .tab-bar, .filter-chips,
+  .stat-row, .info-row, .form-row, .input-row { min-width: 0; }
+  .toolbar > *, .admin-tabs > *, .form-row > *, .input-row > * { min-width: 0; }
+
+  /* 卡片类成员头像 / 图片一律限宽，防止大图撑破卡片 */
+  .gm-card img, .person-card img, .member-card img,
+  .pi-card img, .member-avatar, .avatar-img { max-width: 100%; height: auto; }
+
+  /* 内容容器统一限制最大宽度，杜绝内容绝对定位或固定宽穿透 */
+  .container, .page-hero, article, .article { max-width: 100%; }
+
+  /* 弹窗与面板不留负外边距、占满可用宽度 */
+  .modal, .modal-mask { box-sizing: border-box; }
+  .modal { width: 100%; }
+}
+
+/* ≤400px：更小屏（老款/小屏安卓）额外收紧 */
+@media (max-width: 400px) {
+  .brand-name { font-size: 18px; }
+  .brand-mark { width: 32px; height: 32px; }
+  .news-grid, .work-grid, .quick-links, .info-cards { grid-template-columns: 1fr; }
+}
