@@ -80,7 +80,7 @@
   }
   function renderStarShow() {
     const w = STORE.currentStar("week"); const m = STORE.currentStar("month");
-    const line = (t, s) => s ? `◇ ${s.nickname || s.name}${s.reason ? "（" + esc(s.reason) + "）" : ""} · ${STORE.fmtTime(s.ts)}` : "（尚未评选）";
+    const line = (_, s) => s ? `◇ ${s.nickname || s.name}${s.reason ? "（" + esc(s.reason) + "）" : ""} · ${STORE.fmtTime(s.ts)}` : "（尚未评选）";
     document.getElementById("starShow").innerHTML = `周之星：${line("week", w)}<br>月之星：${line("month", m)}`;
   }
   document.getElementById("btnSetStar").addEventListener("click", () => {
