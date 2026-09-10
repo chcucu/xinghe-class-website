@@ -11,6 +11,19 @@ const STORE = (function () {
   // 上线：填后端 Worker 地址（已绑定自定义域名，国内可直接访问）
   const apiBase = "https://xinghe-api.tenyearmc.top/api";
 
+  // 【响应提速】提前建立到 API 域名的连接（TLS / TCP 握手并行），减少每次请求延迟。
+  // store.js 被每个页面加载，故全站自动生效，无需逐页加 <link>。
+  try {
+    if (document && document.head) {
+      const origin = apiBase.indexOf("/") >= 0 ? apiBase.replace(/\/api\/?$/, "") : apiBase;
+      ["preconnect", "dns-prefetch"].forEach((rel) => {
+        const l = document.createElement("link");
+        l.rel = rel; l.href = origin;
+        document.head.appendChild(l);
+      });
+    }
+  } catch (e) { /* 无关紧要，忽略 */ }
+
   // 后端模式下的会话 / 同步标记
   const TOKEN_KEY = "xh_api_token";
   const SYNC_KEY = "xh_sync_ready";
@@ -605,13 +618,19 @@ const STORE = (function () {
     // 远程模式（部署后端）：本地不再自我初始化，只等待服务端同步
     if (isRemote()) {
       await remoteBootstrap();
-      await resyncDocs();
+      // 【响应提速】首屏不阻塞于远程整库同步：
+      //   - 本地已有上次同步缓存时，先立即用缓存渲染（秒开），把 resyncDocs 放到后台刷新，
+      //     避免每切换一页都要等“拉全量文档 → 全量 JSON 解析”的网络往返，显著降低电脑/手机响应延迟。
+      //   - 仅首次访问（无缓存）仍须等待首次拉取，确保有数据可用。
+      const hasLocal = !!lsGet(KEY.users, null) && lastSyncedAt() > 0;
+      const syncP = resyncDocs().catch(() => {});
+      if (!hasLocal) await syncP;
       // 服务端旧数据可能缺多职务字段：合并后自动按班委表补齐职务标签（幂等，有变化才推回服务端）
       autoApplyCommittee();
       // 核对后分组名单版本变化时，只重建小组数据并推回服务端（不动积分/密码）
       rebuildGroupsFromList();
       // 教师名单增量同步（道法王钰 / 新增物理王老师等）
-      await syncTeachersFromJson();
+      try { await syncTeachersFromJson(); } catch (e) {}
       return;
     }
     // 版本迁移：种子结构变化时，清除旧数据重新初始化
