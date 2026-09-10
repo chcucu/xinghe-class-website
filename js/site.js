@@ -372,7 +372,40 @@
       } catch (e) {}
     }
 
+    // ---- 进入网站开场：品牌 logo 水波浮现（每个会话只在首页首次进入显示一次） ----
+    function initSplash() {
+      if (reduced) return;
+      if (location.pathname.split("/").pop() !== "index.html") return;
+      var seen = false;
+      try { seen = sessionStorage.getItem("xh_splash") === "1"; } catch (e) {}
+      if (seen) return;
+      var wrap = document.createElement("div");
+      wrap.className = "bs-splash";
+      // 水波圆环（两环错峰） + 班徽 + 班名
+      wrap.innerHTML =
+        '<div class="bs-stage">' +
+        '<div class="bs-logo">' +
+        '<i class="bs-ring r1"></i><i class="bs-ring r2"></i>' +
+        '<img src="image/班级logo.jpg" alt="星河班" onerror="this.style.display=\'none\'">' +
+        '<span class="bs-fallback"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.6 6.4 6.9.5-5.2 4.5 1.6 6.7L12 16.6 6.1 20.1l1.6-6.7L2.5 8.9l6.9-.5L12 2z" fill="#ffd977"/></svg></span>' +
+        '</div>' +
+        '<div class="bs-name">星河班</div>' +
+        '<div class="bs-sub">昆三中度假学校 · 八年级一班</div>' +
+        '</div>';
+      document.body.appendChild(wrap);
+      try { sessionStorage.setItem("xh_splash", "1"); } catch (e) {}
+      var hide = function () {
+        if (!wrap.parentNode) return;
+        wrap.classList.add("bs-hide");
+        setTimeout(function () { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 700);
+      };
+      setTimeout(hide, 2100);
+      // 兜底：任何异常下 3.5s 内必定移除，绝不当机挡住内容
+      setTimeout(function () { if (wrap.parentNode) { wrap.classList.add("bs-hide"); setTimeout(function () { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 700); } }, 3500);
+    }
+
     function boot() {
+      initSplash();
       initEnter();
       // 动态渲染的内容（如相册/成员卡由 JS 填充）稍后再补一次进入动画
       setTimeout(initEnter, 320);

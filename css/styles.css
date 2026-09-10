@@ -1047,3 +1047,109 @@ body.xh-leave .xh-veil { animation: xhVeil .36s var(--xh-ease) forwards; }
   transform: rotateY(7deg) rotateX(2.5deg) scale(1.05);
   box-shadow: 0 18px 40px rgba(0, 0, 0, .16);
 }
+
+/* ============================================================
+   开场动画：品牌 logo 水波浮现（进入网站首页）
+   ============================================================ */
+.bs-splash {
+  position: fixed; inset: 0; z-index: 10000;
+  display: grid; place-items: center;
+  background: radial-gradient(120% 120% at 50% 10%, #10131c 0%, #05060a 55%, #000 100%);
+  opacity: 1;
+  transition: opacity .7s var(--xh-ease);
+}
+.bs-splash.bs-hide { opacity: 0; }
+.bs-stage { text-align: center; -webkit-user-select: none; user-select: none; }
+.bs-logo {
+  position: relative; width: 104px; height: 104px; margin: 0 auto 22px;
+  border-radius: 50%;
+}
+.bs-logo img {
+  position: relative; z-index: 2; width: 100%; height: 100%;
+  border-radius: 50%; object-fit: cover;
+  border: 2px solid rgba(255, 217, 151, .35);
+  box-shadow: 0 0 34px rgba(255, 217, 151, .28), 0 18px 44px rgba(0, 0, 0, .55);
+  animation: bsLogoIn 1.1s var(--xh-ease) both;
+}
+.bs-fallback {
+  position: absolute; inset: 0; z-index: 1; display: grid; place-items: center;
+  border-radius: 50%;
+}
+.bs-fallback svg { width: 62px; height: 62px; filter: drop-shadow(0 0 14px rgba(255,217,151,.4)); }
+.bs-ring {
+  position: absolute; inset: 0; z-index: 0; border-radius: 50%;
+  border: 2px solid rgba(255, 217, 151, .65);
+  transform: scale(.6); opacity: 0;
+  animation: bsRing 1.7s var(--xh-ease) infinite;
+}
+.bs-logo .r2 { border-color: rgba(255, 255, 255, .28); animation-delay: .55s; }
+@keyframes bsRing {
+  0%   { transform: scale(.6);  opacity: .8; }
+  70%  { transform: scale(2.1); opacity: .15; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+@keyframes bsLogoIn {
+  0%   { transform: scale(.72); opacity: 0; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.bs-name {
+  font-family: var(--font-script, serif); font-size: 40px; letter-spacing: .16em;
+  color: #fff; padding-left: .16em;
+  animation: bsTextIn 1s var(--xh-ease) .25s both;
+}
+.bs-sub {
+  margin-top: 12px; font-size: 13px; letter-spacing: .14em; color: rgba(255,255,255,.6);
+  animation: bsTextIn 1s var(--xh-ease) .45s both;
+}
+@keyframes bsTextIn {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bs-ring, .bs-logo img, .bs-name, .bs-sub { animation: none; }
+}
+
+/* ============================================================
+   移动端加固（第二批 · 业务页通用）
+   覆盖 小组/部门/投票/接龙/后台 等在手机上的横向溢出现象。
+   ============================================================ */
+@media (max-width: 600px) {
+  /* 弹窗对齐手机底部、占满宽度，macOS 风格圆角 */
+  .modal { max-width: 94vw !important; border-radius: 20px; }
+  .modal-mask { padding: 16px; }
+  .modal .m-title { font-size: 19px; }
+
+  /* 工具箱横排 → 竖排，按钮整幅 */
+  .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .toolbar .btn, .toolbar .btn-outline, .toolbar button { width: 100%; justify-content: center; }
+
+  /* 输入 / 下拉在各种内联布局里撑满，不溢出 */
+  .field .mini, select.mini, input.mini, textarea.mini { max-width: 100% !important; min-width: 0; width: 100%; }
+
+  /* 表格里操作按钮允许换行 */
+  .admin-table td { white-space: normal !important; }
+  .admin-table td button { margin-bottom: 4px; }
+
+  /* 卡片 / 小条内部分行，避免文字挤压溢出 */
+  .redeem-item, .shop-item, .ri-body { flex-wrap: wrap; }
+  .chip { max-width: 100%; }
+  .stat-card, .stat-num { min-width: 0; }
+
+  /* 部门 / 学科 / 小组网格降到两列 */
+  .dept-cards, .subject-list, .pi-list, .skill-grid { grid-template-columns: repeat(2, 1fr); }
+  .group-card, .duty-row { flex-wrap: wrap; }
+
+  /* 标题收敛 */
+  .page-title { font-size: 24px !important; }
+  .stat-num { font-size: 28px; }
+}
+
+/* 小屏：更激进的收敛 */
+@media (max-width: 400px) {
+  /* 关闭部分装饰性留白，让列表一屏更多 */
+  .panel { padding: 14px 12px; }
+  .container { padding-left: 12px; padding-right: 12px; }
+  .page-hero { padding: 30px 0 22px; }
+  .hero-card, .stat-card { padding: 14px; }
+}

@@ -6,6 +6,20 @@
   <meta name="description" content="星河班 · 小组 —— 组长管理组员、安排值日分工、查看组员风采">
   <title>小组 · 星河班</title>
   <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* 小组界面优化：成员卡片网格 */
+    .gm-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:14px; margin-top:6px; }
+    .gm-card { display:flex; flex-direction:column; align-items:center; gap:8px; padding:18px 10px 14px; border:1px solid var(--line); border-radius:18px; background:#fff; text-align:center; transition:transform .3s var(--xh-ease), box-shadow .3s var(--xh-ease), border-color .3s; }
+    .gm-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-sm); border-color:var(--line-2); }
+    .gm-card.leader { border-color:#e5c06f; background:#fffdf3; }
+    .gm-card.self { box-shadow:0 0 0 2px var(--ink); }
+    .gm-name { font-family:var(--font-body); font-weight:600; font-size:14px; color:var(--ink); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gm-cap { font-size:11.5px; color:var(--muted); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gm-kick { margin-top:2px; padding:4px 12px; font-size:11.5px; }
+    .gm-lead-badge { font-family:var(--font-play); font-size:10.5px; color:#b8860b; background:#f7e7c3; padding:2px 8px; border-radius:999px; }
+    @media (max-width:600px){ .gm-card{ padding:14px 6px 12px; } }
+    @media (max-width:440px){ .gm-grid{ grid-template-columns:repeat(3,1fr); gap:10px; } }
+  </style>
 </head>
 <body>
 
@@ -185,12 +199,13 @@
         if (!u) return "";
         const isLeader = g.leaderId === mid;
         const isSelf = mid === s.id;
-        return '<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);">' +
-          portraitHtml(mid, u.name) +
-          '<div style="flex:1;min-width:0;">' +
-          '<b>' + esc(u.nickname || u.name) + '</b>' + (isLeader ? ' <span class="pwd-tag" style="color:#b8860b;border-color:#e5c06f;">组长</span>' : "") +
-          '<div class="hint" style="font-size:12.5px;color:var(--muted);">' + esc(u.name) + '</div></div>' +
-          (isLead && !isLeader ? '<button class="btn-outline" style="padding:5px 10px;font-size:12px;color:#d33;" data-kick="' + mid + '">剔除</button>' : "") +
+        const isGroupLeader = g.leaderId === s.id;
+        const kick = (isLead && !isLeader && (isGroupLeader || s.role === "admin" || s.role === "superadmin") ? '<button class="btn-outline gm-kick" data-kick="' + mid + '">剔除</button>' : "");
+        const badge = isLeader ? '<span class="gm-lead-badge">组长</span>' : "";
+        return '<div class="gm-card' + (isLeader ? ' leader' : '') + (isSelf ? ' self' : '') + '">' +
+          portraitHtml(mid, u.name, 72) +
+          '<div class="gm-name">' + esc(u.nickname || u.name) + badge + '</div>' +
+          '<div class="gm-cap">' + esc(u.name) + '</div>' + kick +
           '</div>';
       }).join("") || '<p class="muted-note">本组暂无可显示成员。</p>';
 

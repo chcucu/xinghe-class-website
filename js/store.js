@@ -30,6 +30,7 @@ const STORE = (function () {
     albums: "xh_albums",        // 宣传部：相册
     notices: "xh_notices",      // 通知公告
     deptNotices: "xh_dept_notices", // 部门弹窗公告（登录后弹窗展示）
+    deptRecords: "xh_dept_records", // 部门专项登记（值日/卫生/打卡/投稿等），9部门各有专用
     duty: "xh_duty",            // 值日表
     wall: "xh_wall",            // 悄悄话墙
     votes: "xh_votes",          // 投票/问卷
@@ -67,7 +68,7 @@ const STORE = (function () {
   /* ---------- 分组名单（核对后，每组首位为组长） ----------
      GROUP_VERSION 每次名单改动时 +1，触发 rebuildGroupsFromList() 更新线上小组数据；
      只重建小组文档（group 列表 + 各用户 groupId），不影响积分/密码/兑换等其它数据。 */
-  const GROUP_VERSION = "g8";
+  const GROUP_VERSION = "g9";
   /* ---------- 教师名单版本：改动 data/teachers.json 时 +1，触发 syncTeachersFromJson 增量同步线上教师 ---------- */
   const T_VERSION = "t2";
   const GROUP_LIST = [
@@ -1795,6 +1796,129 @@ const STORE = (function () {
   }
 
   /* ============================================================
+     部门专项登记（值日班长/卫生评比/作业打卡/征稿/巡检等）
+     文体部不配置；纪检部已用案件公示+举报箱；市监局走 shop.html。
+     登记即公示：本部门成员均可登记，部长/超管可删除，作者可删本人。
+     ============================================================ */
+  const DEPT_RECORD_SCHEMAS = {
+    xingzheng: {
+      name: "考勤与值日班长",
+      hint: "行政部登记每日考勤：值日班长、迟到与缺勤情况。",
+      fields: [
+        { key: "date", label: "日期", type: "date" },
+        { key: "leader", label: "值日班长", type: "text" },
+        { key: "late", label: "迟到名单", type: "text" },
+        { key: "absent", label: "缺勤名单", type: "text" },
+        { key: "note", label: "备注", type: "textarea" },
+      ],
+      cols: [["date", "日期"], ["leader", "值日班长"], ["late", "迟到"], ["absent", "缺勤"]],
+    },
+    houqin: {
+      name: "卫生评比",
+      hint: "后勤部登记每周卫生检查得分，期末汇总评比。",
+      fields: [
+        { key: "week", label: "周次", type: "text" },
+        { key: "groupName", label: "小组", type: "text" },
+        { key: "score", label: "得分", type: "text" },
+        { key: "note", label: "备注", type: "textarea" },
+      ],
+      cols: [["week", "周次"], ["groupName", "小组"], ["score", "得分"]],
+    },
+    xuexi: {
+      name: "作业收交与背书检查",
+      hint: "学习部登记作业收交、背书过关情况，公示未交/未过关名单。",
+      fields: [
+        { key: "date", label: "日期", type: "date" },
+        { key: "subject", label: "科目", type: "text" },
+        { key: "task", label: "作业/任务", type: "text" },
+        { key: "unsub", label: "未交/未过关名单", type: "text" },
+        { key: "note", label: "备注", type: "textarea" },
+      ],
+      cols: [["date", "日期"], ["subject", "科目"], ["task", "任务"], ["unsub", "未交名单"]],
+    },
+    xuanchuan: {
+      name: "素材征集",
+      hint: "宣传部登记照片、素材征集主题与完成情况。",
+      fields: [
+        { key: "date", label: "日期", type: "date" },
+        { key: "theme", label: "征集主题", type: "text" },
+        { key: "status", label: "完成情况", type: "text" },
+        { key: "note", label: "备注", type: "textarea" },
+      ],
+      cols: [["date", "日期"], ["theme", "主题"], ["status", "完成情况"]],
+    },
+    bianji: {
+      name: "征稿启事",
+      hint: "编辑部发布各期征稿主题与收稿情况。",
+      fields: [
+        { key: "issue", label: "期号", type: "text" },
+        { key: "theme", label: "征稿主题", type: "text" },
+        { key: "deadline", label: "截止日期", type: "date" },
+        { key: "note", label: "收稿情况", type: "textarea" },
+      ],
+      cols: [["issue", "期号"], ["theme", "主题"], ["deadline", "截止日期"]],
+    },
+    xinxianquan: {
+      name: "网站巡检记录",
+      hint: "信息安全部登记网站巡检、问题排查与处理情况。",
+      fields: [
+        { key: "date", label: "日期", type: "date" },
+        { key: "item", label: "巡检项", type: "text" },
+        { key: "result", label: "巡检结果", type: "text" },
+        { key: "note", label: "处理记录", type: "textarea" },
+      ],
+      cols: [["date", "日期"], ["item", "巡检项"], ["result", "结果"]],
+    },
+    huodong: {
+      name: "活动方案公示",
+      hint: "活动策划部公示活动方案、时间地点与筹备进度。",
+      fields: [
+        { key: "name", label: "活动名称", type: "text" },
+        { key: "date", label: "活动时间", type: "date" },
+        { key: "venue", label: "地点", type: "text" },
+        { key: "note", label: "方案要点", type: "textarea" },
+      ],
+      cols: [["name", "活动名称"], ["date", "活动时间"], ["venue", "地点"]],
+    },
+  };
+
+  function getDeptRecords(deptId) {
+    return lsGet(KEY.deptRecords, []).filter((x) => x.dept === deptId);
+  }
+  // 登记即公示：本部门成员均可登记（无需部长审核）
+  function addDeptRecord(deptId, fields) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    if (!canEditDept(deptId)) return { ok: false, msg: "你不属于该部门，无法登记" };
+    if (!fields || !Object.keys(fields).some((k) => fields[k])) return { ok: false, msg: "请至少填写一项内容" };
+    const rec = {
+      id: uid("rec"),
+      dept: deptId,
+      ...fields,
+      status: "published",
+      authorId: s.id,
+      authorName: s.nickname || s.name,
+      createdTs: now(),
+    };
+    const all = lsGet(KEY.deptRecords, []);
+    all.unshift(rec);
+    lsSet(KEY.deptRecords, all);
+    const head = fields.date || fields.week || fields.name || fields.theme || fields.title || "登记";
+    logAction("新增部门登记", (DEPTS[deptId]?.name || deptId) + "：「" + head + "」");
+    return { ok: true, msg: "已登记并公示" };
+  }
+  // 删除：部长/超管可删任意登记，作者可删本人登记
+  function deleteDeptRecord(id) {
+    const s = getSession(); if (!s) return { ok: false, msg: "未登录" };
+    const all = lsGet(KEY.deptRecords, []);
+    const rec = all.find((x) => x.id === id);
+    if (!rec) return { ok: false, msg: "登记不存在" };
+    if (!canApproveDept(rec.dept) && rec.authorId !== s.id) return { ok: false, msg: "无权限删除" };
+    lsSet(KEY.deptRecords, all.filter((x) => x.id !== id));
+    logAction("删除部门登记", (DEPTS[rec.dept]?.name || rec.dept) + " · " + id);
+    return { ok: true };
+  }
+
+  /* ============================================================
      部门弹窗公告：本部门成员可发布，登录后按部门弹窗展示
      ============================================================ */
   function getDeptNotices() { return lsGet(KEY.deptNotices, []); }
@@ -2812,6 +2936,7 @@ const STORE = (function () {
     getMedia, addMedia, deleteMedia,
     DEPTS, COMMITTEE, PREV_COMMITTEE, canEditDept, canApproveDept, myDepartment,
     getDeptItems, saveDeptItems, addDeptItem, updateDeptItem, reviewDeptItem, deleteDeptItem,
+    DEPT_RECORD_SCHEMAS, getDeptRecords, addDeptRecord, deleteDeptRecord,
     getDeptNotices, addDeptNotice, reviewDeptNotice, deleteDeptNotice, unreadDeptNotices, markDeptNoticeRead,
     myReports, submitReport, markReport,
     getAlbums, saveAlbums, addAlbum, addAlbumPhoto, reviewAlbumPhoto, deleteAlbumPhoto, deleteAlbum, allPublishedPhotos,
