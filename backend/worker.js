@@ -217,7 +217,7 @@ async function docsLogin(request, env) {
       return list;
     }, []);
   }
-  return { ok: true, token: await signToken(u.id), user: { id: u.id, name: u.name, role: u.role, mustChange: !!u.mustChange } };
+  return { ok: true, token: await signToken(u.id), user: { id: u.id, name: u.name, role: u.role, nickname: u.nickname, avatar: u.avatar, mustChange: !!u.mustChange } };
 }
 
 // 公开注册：家长 / 访客申请账号（进入待审核）。
@@ -376,7 +376,7 @@ const SCORE_ROLES = ["teacher", "admin", "monitor", "superadmin"]; // 有权改�
 function canScoreRole(role) { return SCORE_ROLES.includes(role); }
 // 非超管写 users 时，用服务端既有值冻结 role/status/职务字段，防止教班委自提权、
 // 篡改部门职务或代别人审批恢复
-function guardUserRoles(incoming, existing) {
+function guardUserRoles(incoming, existing, role) {
   const map = {};
   (Array.isArray(existing) ? existing : []).forEach((u) => { if (u && u.id) map[u.id] = u; });
   return (Array.isArray(incoming) ? incoming : []).map((u) => {
@@ -384,7 +384,10 @@ function guardUserRoles(incoming, existing) {
     if (!old) return u;
     const out = Object.assign({}, u);
     out.role = old.role || u.role;
-    out.status = old.status || u.status;
+    // status 为注册审核状态（pending→approved/rejected）。审核权仅授予超管（reviewRegister 限定 isSuperAdmin），
+    // 故超管写入时放行 status 变更（否则审核结果每次都被旧值覆盖回 pending，家长端永远“待班主任审核”）；
+    // 其它计分角色写入时仍冻结 status，防止班委/教师代放行账号。
+    out.status = role === "superadmin" ? (u.status !== undefined ? u.status : old.status) : (old.status || u.status);
     out.posts = Array.isArray(old.posts) ? old.posts : (old.department ? [{ dept: old.department, role: old.departmentRole === "minister" ? "minister" : "member" }] : []);
     out.department = old.department || "";
     out.departmentRole = old.departmentRole || "";
@@ -447,7 +450,7 @@ async function putDocs(request, env, auth) {
   const batch = [];
   allowed.forEach((k) => {
     let val = docs[k];
-    if (k === "users" && existingUsers !== null) val = guardUserRoles(val, existingUsers); // 冻结 role/status
+    if (k === "users" && existingUsers !== null) val = guardUserRoles(val, existingUsers, auth.role); // 冻结 role/职务字段（status 仅超管可改）
     batch.push(
       env.DB.prepare("INSERT OR REPLACE INTO docs (key, value, updated_at) VALUES (?, ?, datetime('now'))")
         .bind(k, JSON.stringify(val))

@@ -403,21 +403,6 @@ const STORE = (function () {
   function apiToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
   function setApiToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
 
-  // 向服务端换取不可伪造的签名令牌（id.HMAC-SHA256(id)，密钥在 Worker 侧）。
-  // 成功即存；离线或未配置密钥时回退为旧 base64(id)，保证可用但不承诺防伪。
-  async function fetchSignedToken(account, password) {
-    try {
-      const r = await fetch(apiBase + "/docs/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account: account, password: password }),
-      });
-      const d = await r.json();
-      if (d && d.ok && d.token) return d.token;
-    } catch (e) { /* 网络失败走回退 */ }
-    return null;
-  }
-
   // 把本地数据推送到服务端；未登录或非写权限会静默跳过（下次同步再补）。
   // 仅推送“本会话内实际修改过”的数据键（dirty），避免登录时把陈旧的本地快照
   // 覆盖掉其他同学在服务端的最新数据。
@@ -876,6 +861,33 @@ const STORE = (function () {
 
   /* ---------- 认证 ---------- */
   async function login(account, password) {
+    // 远程模式：以服务端权威校验为准（服务端检查账号/密码/审核状态），
+    // 避免本地缓存滞后的 status 导致“已通过审核仍提示待班主任审核”。
+    if (isRemote()) {
+      try {
+        const resp = await fetch(apiBase + "/docs/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ account, password }),
+        });
+        const d = await resp.json();
+        if (!d || !d.ok) return { ok: false, msg: (d && d.msg) || "登录失败，请稍后重试" };
+        setApiToken(d.token);
+        const session = {
+          id: d.user.id, account, name: d.user.name, role: d.user.role,
+          nickname: d.user.nickname, avatar: d.user.avatar, mustChange: !!d.user.mustChange,
+        };
+        lsSet(KEY.session, session);
+        pushDocs(); // 推送本会话内积攒的本地改动
+        try { await resyncDocs(); } catch (e) {} // 拉取最新全量数据（含审核后的 status）
+        try { refreshSession(); } catch (e) {}   // 用最新用户数据刷新昵称/头像
+        logAction("登录", "账号 " + account + " 登录成功");
+        return { ok: true, user: session };
+      } catch (e) {
+        return { ok: false, msg: "网络异常，请稍后重试" };
+      }
+    }
+    // 本地模式
     const users = getUsers();
     const u = users.find((x) => x.account === account);
     if (!u) return { ok: false, msg: "账号不存在" };
@@ -891,15 +903,6 @@ const STORE = (function () {
       nickname: u.nickname, avatar: u.avatar, mustChange: u.mustChange,
     };
     lsSet(KEY.session, session);
-    // 远程模式：向服务端换取签名令牌；换取失败回退 base64(id)
-    if (isRemote()) {
-      let token = await fetchSignedToken(u.account, password);
-      if (!token) { try { token = btoa(u.id); } catch (e) { token = ""; } }
-      setApiToken(token);
-      if (upgraded) pushMe({ password: u.password, mustChange: u.mustChange }); // 明文升级后的哈希推到服务端
-      pushDocs(); // 把本会话内修改过的数据推送到服务端
-      resyncDocs();
-    }
     logAction("登录", "账号 " + u.account + " 登录成功", u.name);
     return { ok: true, user: session };
   }
