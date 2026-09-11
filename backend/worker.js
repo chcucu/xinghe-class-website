@@ -147,10 +147,8 @@ export default {
       const auth = await authenticate(request, env);
 
       // 公开接口
-      if (path === "/login" && method === "POST") result = await doLogin(request, env);
-      else if (path === "/docs/login" && method === "POST") result = await docsLogin(request, env);
+      if (path === "/docs/login" && method === "POST") result = await docsLogin(request, env);
       else if (path === "/docs/register" && method === "POST") result = await docsRegister(request, env);
-      else if (path === "/leaderboard" && method === "GET") result = leaderboard(env);
       else if (path === "/docs" && method === "GET") result = await getDocs(request, env);
       else if (path === "/docs/bootstrap" && method === "POST") result = await docsBootstrap(request, env);
       // R2 图片（公开读取）
@@ -162,17 +160,10 @@ export default {
           case path === "/upload" && method === "POST": result = await uploadFile(request, env); break;
           case path === "/me" && method === "GET": result = await me(request, env, auth); break;
           case path === "/me/update" && method === "POST": result = await updateMe(request, env, auth); break;
-          case path === "/change-password" && method === "POST": result = await changePassword(request, env, auth); break;
-          case path === "/delta" && method === "POST": result = await applyDelta(request, env, auth); break;
-          case path === "/undo" && method === "POST": result = await undoLast(env, auth); break;
-          case path === "/redeem" && method === "POST": result = await applyRedeem(request, env, auth); break;
-          case path === "/redeem/review" && method === "POST": result = await reviewRedeem(request, env, auth); break;
-          case path === "/redeem/offline" && method === "POST": result = await offlineDeduct(request, env, auth); break;
-          case path === "/my/ledger" && method === "GET": result = myLedger(env, auth); break;
-          case path === "/my/redeems" && method === "GET": result = myRedeems(env, auth); break;
-          case path === "/meta" && method === "GET": result = await getMeta(env); break;
           case path === "/docs" && method === "PUT": result = await putDocs(request, env, auth); break;
           case path === "/docs/reset" && method === "POST": result = await docsReset(request, env, auth); break;
+          case path === "/cashout/apply" && method === "POST": result = await applyCashout(request, env, auth); break;
+          case path === "/cashout/manual" && method === "POST": result = await recordManualCashout(request, env, auth); break;
           case path === "/cashout/review" && method === "POST": result = await reviewCashout(request, env, auth); break;
           default: result = json({ ok: false, msg: "接口不存在" }, 404);
         }
@@ -274,19 +265,6 @@ async function docsRegister(request, env) {
   return { ok: true, id: newU.id };
 }
 
-async function doLogin(request, env) {
-  const { account, password } = await request.json();
-  if (!account || !password) return { ok: false, msg: "请填写账号和密码" };
-  const u = await env.DB.prepare("SELECT * FROM users WHERE account = ?").bind(account).first();
-  if (!u) return { ok: false, msg: "账号不存在" };
-  if ((await checkPassword(password, u.password_hash)) === null) return { ok: false, msg: "密码错误" };
-  return {
-    ok: true,
-    token: await signToken(u.id),
-    user: { id: u.id, name: u.name, role: u.role, mustChange: !!u.must_change },
-  };
-}
-
 async function me(request, env, auth) {
   // 读 users 文档返回真实 score / mustChange / cashRate（否则这些字段恒为 undefined）
   let score = 0, mustChange = false, cashRate = 5;
@@ -301,14 +279,6 @@ async function me(request, env, auth) {
     }
   }
   return { ok: true, user: { id: auth.id, name: auth.name, role: auth.role, mustChange, score, cashRate } };
-}
-
-async function changePassword(request, env, auth) {
-  const { password } = await request.json();
-  if (!password || password.length < 4) return { ok: false, msg: "密码至少 4 位" };
-  const hash = await hashPassword(password);
-  await env.DB.prepare("UPDATE users SET password_hash = ?, must_change = 0 WHERE id = ?").bind(hash, auth.id).run();
-  return { ok: true };
 }
 
 // 用户仅可更新自己的个人字段（头像/昵称申请/简介/简介图/联系方式）。
@@ -355,137 +325,6 @@ async function updateMe(request, env, auth) {
   if (!res.ok) return res;
   if (res.skipped) return { ok: false, msg: "用户不存在" };
   return { ok: true };
-}
-
-async function leaderboard(env) {
-  const rows = await env.DB.prepare("SELECT id, name, score FROM users WHERE role = 'student' ORDER BY score DESC").all();
-  let rank = 0, prev = null;
-  const list = rows.results.map((u, i) => {
-    if (prev === null || u.score !== prev) rank = i + 1;
-    prev = u.score;
-    return { id: u.id, name: u.name, score: u.score, rank };
-  });
-  const meta = await env.DB.prepare("SELECT value FROM meta WHERE key = 'last'").first();
-  let last = null, operator = "—";
-  if (meta) { try { const m = JSON.parse(meta.value); last = m.ts; operator = m.operator; } catch (e) {} }
-  return { ok: true, list, last, operator };
-}
-
-function canEdit(role) { return ["teacher", "admin", "monitor"].includes(role); }
-
-async function applyDelta(request, env, auth) {
-  if (!canEdit(auth.role)) return { ok: false, msg: "无权限修改分数" };
-  const { studentId, delta, reason } = await request.json();
-  const d = Math.round(Number(delta) * 100) / 100;
-  if (!studentId || isNaN(d) || d === 0) return { ok: false, msg: "参数无效" };
-
-  const u = await env.DB.prepare("SELECT * FROM users WHERE id = ? AND role = 'student'").bind(studentId).first();
-  if (!u) return { ok: false, msg: "目标学生不存在" };
-  const after = Math.round((u.score + d) * 100) / 100;
-
-  await env.DB.batch([
-    env.DB.prepare("UPDATE users SET score = ? WHERE id = ?").bind(after, studentId),
-    env.DB.prepare("INSERT INTO ledger (id, uid, name, delta, after, reason, operator, operator_role) VALUES (?,?,?,?,?,?,?,?)")
-      .bind(uid("led"), studentId, u.name, d, after, reason || "手动调整", auth.name, auth.role),
-  ]);
-  await setMeta(env, auth);
-  return { ok: true };
-}
-
-async function undoLast(env, auth) {
-  if (!canEdit(auth.role)) return { ok: false, msg: "无权限" };
-  const last = await env.DB.prepare("SELECT * FROM ledger ORDER BY rowid DESC LIMIT 1").first();
-  if (!last) return { ok: false, msg: "没有可撤销的记录" };
-  const u = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(last.uid).first();
-  const after = u ? Math.round((u.score - last.delta) * 100) / 100 : 0;
-  await env.DB.batch([
-    env.DB.prepare("UPDATE users SET score = ? WHERE id = ?").bind(after, last.uid),
-    env.DB.prepare("DELETE FROM ledger WHERE id = ?").bind(last.id),
-    env.DB.prepare("INSERT INTO ledger (id, uid, name, delta, after, reason, operator, operator_role) VALUES (?,?,?,?,?,?,?,?)")
-      .bind(uid("led"), last.uid, last.name, -last.delta, after, "撤销：" + last.reason + "（冲红）", auth.name, auth.role),
-  ]);
-  await setMeta(env, auth);
-  return { ok: true };
-}
-
-async function applyRedeem(request, env, auth) {
-  if (auth.role !== "student") return { ok: false, msg: "只有学生可申请兑换" };
-  const { item, cost } = await request.json();
-  const c = Math.round(Number(cost) * 100) / 100;
-  if (!item || isNaN(c) || c <= 0) return { ok: false, msg: "参数无效" };
-  await env.DB.prepare("INSERT INTO redeems (id, uid, name, item, cost, status) VALUES (?,?,?,?,?, 'pending')")
-    .bind(uid("rd"), auth.id, auth.name, item, c).run();
-  return { ok: true };
-}
-
-async function reviewRedeem(request, env, auth) {
-  if (!canEdit(auth.role)) return { ok: false, msg: "无权限审批" };
-  const { redeemId, approve, reason } = await request.json();
-  const rd = await env.DB.prepare("SELECT * FROM redeems WHERE id = ?").bind(redeemId).first();
-  if (!rd) return { ok: false, msg: "兑换单不存在" };
-  if (rd.status !== "pending") return { ok: false, msg: "该单已处理" };
-
-  const status = approve ? "approved" : "rejected";
-  if (approve) {
-    const u = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(rd.uid).first();
-    if (!u) return { ok: false, msg: "学生不存在" };
-    if (Number(u.score) < Number(rd.cost)) return { ok: false, msg: "学生积分不足，无法通过" };
-    const after = Math.round((u.score - rd.cost) * 100) / 100;
-    await env.DB.batch([
-      env.DB.prepare("UPDATE users SET score = ? WHERE id = ?").bind(after, rd.uid),
-      env.DB.prepare("INSERT INTO ledger (id, uid, name, delta, after, reason, operator, operator_role) VALUES (?,?,?,?,?,?,?,?)")
-        .bind(uid("led"), rd.uid, rd.name, -rd.cost, after, "兑换扣分：" + rd.item, auth.name, auth.role),
-      env.DB.prepare("UPDATE redeems SET status = ?, approve_ts = datetime('now'), operator = ?, reason = ? WHERE id = ?")
-        .bind(status, auth.name, reason || (approve ? "兑换成功" : "兑换被拒"), redeemId),
-    ]);
-  } else {
-    await env.DB.prepare("UPDATE redeems SET status = ?, approve_ts = datetime('now'), operator = ?, reason = ? WHERE id = ?")
-      .bind(status, auth.name, reason || "兑换被拒", redeemId).run();
-  }
-  await setMeta(env, auth);
-  return { ok: true };
-}
-
-async function offlineDeduct(request, env, auth) {
-  if (!canEdit(auth.role)) return { ok: false, msg: "无权限" };
-  const { studentId, item, cost, reason } = await request.json();
-  const c = Math.round(Number(cost) * 100) / 100;
-  if (!studentId || isNaN(c) || c <= 0) return { ok: false, msg: "参数无效" };
-  const u = await env.DB.prepare("SELECT * FROM users WHERE id = ? AND role = 'student'").bind(studentId).first();
-  if (!u) return { ok: false, msg: "学生不存在" };
-  if (Number(u.score) < c) return { ok: false, msg: "学生积分不足，无法扣减" };
-  const after = Math.round((u.score - c) * 100) / 100;
-  await env.DB.batch([
-    env.DB.prepare("UPDATE users SET score = ? WHERE id = ?").bind(after, studentId),
-    env.DB.prepare("INSERT INTO ledger (id, uid, name, delta, after, reason, operator, operator_role) VALUES (?,?,?,?,?,?,?,?)")
-      .bind(uid("led"), studentId, u.name, -c, after, reason || ("线下兑换：" + (item || "奖品")), auth.name, auth.role),
-    env.DB.prepare("INSERT INTO redeems (id, uid, name, item, cost, status, approve_ts, operator) VALUES (?,?,?,?,?, 'approved', datetime('now'), ?)")
-      .bind(uid("rd"), studentId, u.name, item || "线下兑换", c, auth.name),
-  ]);
-  await setMeta(env, auth);
-  return { ok: true };
-}
-
-async function myLedger(env, auth) {
-  const rows = await env.DB.prepare("SELECT * FROM ledger WHERE uid = ? ORDER BY rowid DESC").bind(auth.id).all();
-  return { ok: true, list: rows.results };
-}
-
-async function myRedeems(env, auth) {
-  const rows = await env.DB.prepare("SELECT * FROM redeems WHERE uid = ? ORDER BY rowid DESC").bind(auth.id).all();
-  return { ok: true, list: rows.results };
-}
-
-async function getMeta(env) {
-  const meta = await env.DB.prepare("SELECT value FROM meta WHERE key = 'last'").first();
-  if (!meta) return { ok: true, last: null, operator: "—" };
-  try { const m = JSON.parse(meta.value); return { ok: true, last: m.ts, operator: m.operator }; }
-  catch (e) { return { ok: true, last: null, operator: "—" }; }
-}
-
-async function setMeta(env, auth) {
-  await env.DB.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('last', ?)")
-    .bind(JSON.stringify({ ts: new Date().toISOString(), operator: auth.name })).run();
 }
 
 // ============================================================
@@ -559,6 +398,11 @@ function seedSecret(env) {
   return typeof s === "string" && s.length ? s : null;
 }
 
+// 首启种子校验值。硬编码属低危：bootstrap 仅在 docs 为空时可执行（幂等，只能成功一次），
+// 且只导入种子数据、不授予身份；配合 putDocs 服务端权威权限与删除 SQL 死代码后风险更低。
+// 真正的破坏性重置走 docsReset（需超管 + AUTH_SECRET 环境变量），不依赖本常量。
+const BOOTSTRAP_SEED = "xinghe-2026-seed";
+
 async function getDocs(request, env) {
   const url = new URL(request.url);
   const keys = (url.searchParams.get("keys") || "").split(",").filter(Boolean);
@@ -575,7 +419,11 @@ async function getDocs(request, env) {
 async function putDocs(request, env, auth) {
   // 覆盖权限由服务端权威判定，绝不信任客户端传来的 body.perms（防任意登录用户整表写 users 提权）。
   // 规则：
-  //   users —— 仅 教师/班委/管理 可覆盖（且非超管写入时冻结 role/status，防止自提权）；
+  //   users   —— 仅 教师/班委/管理 可覆盖（且非超管写入时冻结 role/status，防止自提权）；
+  //   ledger  —— 积分流水日志，仅计分角色可整表写（普通学生不可伪造流水）；
+  //   cashouts—— 零花钱申请/审批记录，仅计分角色可整表写；学生的“申请”与家长的“手动记录”
+  //              分别走 /cashout/apply 与 /cashout/manual 专用端点（服务端 casDoc 追加），
+  //              杜绝普通学生把自家申请伪造成 paid。
   //   其余文档 —— 登录即可写。
   const body = await request.json();
   const docs = body.docs || {};
@@ -591,7 +439,7 @@ async function putDocs(request, env, auth) {
   }
   // 服务端权威判定：这份文档该用户能否覆盖
   const allowed = names.filter((k) => {
-    if (k === "users") return canScore;
+    if (k === "users" || k === "ledger" || k === "cashouts") return canScore;
     return true; // 其余文档登录即可写
   });
   if (!allowed.length) return { ok: false, msg: "没有权限写入这些内容" };
@@ -611,7 +459,7 @@ async function putDocs(request, env, auth) {
 
 async function docsBootstrap(request, env) {
   const body = await request.json();
-  if (body.seed !== "xinghe-2026-seed") return json({ ok: false, msg: "校验失败" }, 403);
+  if (body.seed !== BOOTSTRAP_SEED) return json({ ok: false, msg: "校验失败" }, 403);
   const docs = body.docs || {};
   const names = Object.keys(docs);
   if (!names.length) return { ok: false, msg: "没有内容" };
@@ -646,6 +494,62 @@ async function docsReset(request, env, auth) {
   ));
   await env.DB.batch(batch);
   return { ok: true, reset: names.length };
+}
+
+// 学生申请零花钱兑换：服务端追加 pending 申请（casDoc 乐观锁，防止并发覆盖他人申请）。
+// 专用于学生侧 —— putDocs 的 cashouts 仅计分角色可整表写，学生无法直接把申请伪造成 paid。
+async function applyCashout(request, env, auth) {
+  if (auth.role !== "student" && auth.role !== "superadmin") return { ok: false, msg: "只有学生可申请兑换零花钱" };
+  const { points, note } = await request.json();
+  const p = Math.round(Number(points) * 100) / 100;
+  if (isNaN(p) || p <= 0) return { ok: false, msg: "兑换积分无效" };
+  const row = await readDoc(env, "users");
+  const users = row ? safeJson(row.value, null) : null;
+  if (!Array.isArray(users)) return { ok: false, msg: "用户数据未初始化" };
+  const u = users.find((x) => x.id === auth.id);
+  if (!u) return { ok: false, msg: "用户不存在" };
+  if (Number(u.score) < p) return { ok: false, msg: "积分不足（当前 " + u.score + " 分）" };
+  const parent = users.find((x) => x.role === "parent" && x.studentId === auth.id);
+  if (!parent) return { ok: false, msg: "你尚未绑定家长：请在家长注册时选择你作为孩子" };
+  const rate = Number(parent.cashRate) > 0 ? Math.round(Number(parent.cashRate) * 100) / 100 : 5;
+  const money = Math.round(p * rate * 100) / 100;
+  const rec = {
+    id: uid("co"), type: "apply",
+    studentId: auth.id, studentName: u.name,
+    parentId: parent.id, parentName: parent.name,
+    points: p, money, rate,
+    status: "pending",
+    applyTs: new Date().toISOString(), reviewTs: null, paidTs: null,
+    operator: "", reason: "", note: String(note || "").trim().slice(0, 200),
+  };
+  const res = await casDoc(env, "cashouts", (list) => { list.unshift(rec); return list; }, []);
+  if (!res.ok) return res;
+  return { ok: true, money, rate, record: rec };
+}
+
+// 家长手动记录已兑换零花钱（不扣分，仅登记）—— 同样走服务端追加，家长不可整表改 cashouts。
+async function recordManualCashout(request, env, auth) {
+  if (auth.role !== "parent") return { ok: false, msg: "仅家长可记录零花钱" };
+  const { money, note } = await request.json();
+  const m = Math.round(Number(money) * 100) / 100;
+  if (isNaN(m) || m <= 0) return { ok: false, msg: "金额无效" };
+  const row = await readDoc(env, "users");
+  const users = row ? safeJson(row.value, null) : null;
+  if (!Array.isArray(users)) return { ok: false, msg: "用户数据未初始化" };
+  const child = users.find((x) => x.role === "student" && users.some((p) => p.id === auth.id && p.studentId === x.id));
+  if (!child) return { ok: false, msg: "你尚未关联孩子" };
+  const rec = {
+    id: uid("co"), type: "manual",
+    studentId: child.id, studentName: child.name,
+    parentId: auth.id, parentName: auth.name,
+    points: 0, money: m, rate: 0,
+    status: "paid",
+    applyTs: new Date().toISOString(), reviewTs: null, paidTs: new Date().toISOString(),
+    operator: auth.name, reason: "家长手动记录", note: String(note || "").trim().slice(0, 200),
+  };
+  const res = await casDoc(env, "cashouts", (list) => { list.unshift(rec); return list; }, []);
+  if (!res.ok) return res;
+  return { ok: true, record: rec };
 }
 
 // 家长审批零花钱兑换：通过则扣除孩子积分并记为已兑换（服务端权威处理）。

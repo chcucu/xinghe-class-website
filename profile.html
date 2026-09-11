@@ -353,8 +353,8 @@
         else { window.showToast(r.msg, "error"); }
       });
 
-      document.getElementById("btnCoManual").addEventListener("click", () => {
-        const r = STORE.recordManualCashout({
+      document.getElementById("btnCoManual").addEventListener("click", async () => {
+        const r = await STORE.recordManualCashout({
           money: document.getElementById("coManualMoney").value,
           note: document.getElementById("coManualNote").value.trim(),
         });

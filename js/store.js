@@ -1313,14 +1313,40 @@ const STORE = (function () {
     return { ok: true, rate: r };
   }
   // 学生：申请零花钱兑换（直接向绑定家长发送申请）
-  function applyCashout(points, note) {
+  async function applyCashout(points, note) {
     const s = getSession();
     if (!s) return { ok: false, msg: "未登录" };
     if (s.role !== "student" && s.role !== "superadmin") return { ok: false, msg: "只有学生可申请兑换零花钱" };
-    const parent = myParent();
-    if (!parent) return { ok: false, msg: "你尚未绑定家长：请在家长注册时选择你作为孩子" };
     const pNum = Math.round(Number(points) * 100) / 100;
     if (isNaN(pNum) || pNum <= 0) return { ok: false, msg: "兑换积分无效" };
+    if (isRemote()) {
+      // 远程模式：申请由服务端权威追加（putDocs 的 cashouts 仅计分角色可整表写），
+      // 普通学生无法再直接把自家申请伪造成 paid。本地只做快速前置校验，最终以服务端为准。
+      const parent = myParent();
+      if (!parent) return { ok: false, msg: "你尚未绑定家长：请在家长注册时选择你作为孩子" };
+      const u = findById(s.id);
+      if (!u) return { ok: false, msg: "用户不存在" };
+      if (u.score < pNum) return { ok: false, msg: "积分不足（当前 " + u.score + " 分）" };
+      try {
+        const resp = await fetch(apiBase + "/cashout/apply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiToken() },
+          body: JSON.stringify({ points: pNum, note: String(note || "").trim() }),
+        });
+        const d = await resp.json();
+        if (d && d.ok && d.record) {
+          const list = getCashouts();
+          list.unshift(d.record);
+          saveCashouts(list);
+          logAction("申请兑换零花钱", "向家长 " + (d.record.parentName || "") + " 申请兑换 " + pNum + " 分 = " + d.money + " 元");
+          return { ok: true, money: d.money, rate: d.rate };
+        }
+        return d && d.msg ? { ok: false, msg: d.msg } : { ok: false, msg: "服务端处理失败" };
+      } catch (e) { return { ok: false, msg: "网络异常，请稍后重试" }; }
+    }
+    // 本地模式
+    const parent = myParent();
+    if (!parent) return { ok: false, msg: "你尚未绑定家长：请在家长注册时选择你作为孩子" };
     const users = getUsers();
     const u = users.find((x) => x.id === s.id);
     if (!u) return { ok: false, msg: "用户不存在" };
@@ -1399,14 +1425,34 @@ const STORE = (function () {
     return { ok: true };
   }
   // 家长：手动记录已经兑换的零花钱（不扣积分，仅登记）
-  function recordManualCashout({ money, note }) {
+  async function recordManualCashout({ money, note }) {
     const s = getSession();
     if (!s) return { ok: false, msg: "未登录" };
     if (s.role !== "parent") return { ok: false, msg: "仅家长可记录零花钱" };
-    const child = myChild();
-    if (!child) return { ok: false, msg: "你尚未关联孩子" };
     const m = Math.round(Number(money) * 100) / 100;
     if (isNaN(m) || m <= 0) return { ok: false, msg: "金额无效" };
+    if (isRemote()) {
+      // 远程模式：由服务端权威追加（家长不可整表改 cashouts，防止伪造孩子零花钱记录）
+      try {
+        const resp = await fetch(apiBase + "/cashout/manual", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiToken() },
+          body: JSON.stringify({ money: m, note: String(note || "").trim() }),
+        });
+        const d = await resp.json();
+        if (d && d.ok && d.record) {
+          const list = getCashouts();
+          list.unshift(d.record);
+          saveCashouts(list);
+          logAction("手动记录零花钱", "为孩子 " + d.record.studentName + " 登记已兑换零花钱 " + m + " 元");
+          return { ok: true };
+        }
+        return d && d.msg ? { ok: false, msg: d.msg } : { ok: false, msg: "服务端处理失败" };
+      } catch (e) { return { ok: false, msg: "网络异常，请稍后重试" }; }
+    }
+    // 本地模式
+    const child = myChild();
+    if (!child) return { ok: false, msg: "你尚未关联孩子" };
     const list = getCashouts();
     list.unshift({
       id: uid("co"), type: "manual",

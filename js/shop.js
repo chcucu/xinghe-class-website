@@ -70,8 +70,8 @@
     };
     coPoints.addEventListener("input", upd);
 
-    document.getElementById("btnCashout").addEventListener("click", () => {
-      const r = STORE.applyCashout(coPoints.value, document.getElementById("coNote").value.trim());
+    document.getElementById("btnCashout").addEventListener("click", async () => {
+      const r = await STORE.applyCashout(coPoints.value, document.getElementById("coNote").value.trim());
       if (r.ok) {
         window.showToast("已向家长发送兑换申请：" + r.money + " 元，等待确认", "success");
         coPoints.value = ""; document.getElementById("coNote").value = ""; upd();
