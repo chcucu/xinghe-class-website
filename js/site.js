@@ -93,6 +93,7 @@
         (s.role === "parent" ? '<a class="us-item us-link" href="archive.html">我的孩子</a>' : "") +
         '<a class="us-item us-link" href="profile.html">用户中心</a>' +
         (STORE.isSiteAdmin(s) ? '<a class="us-item us-link us-admin" href="admin.html">后台</a>' : "") +
+        '<span class="us-bell-wrap" id="usBellWrap"></span>' +
         '<button class="us-item us-btn" id="usLogout">退出</button>';
       var btn = document.getElementById("usLogout");
       if (btn) btn.addEventListener("click", function () { STORE.logout(); location.href = "identity.html"; });
@@ -100,6 +101,216 @@
       strip.innerHTML = '<a class="us-item us-link" href="identity.html">登录</a>';
     }
   }
+
+  // ============ 消息通知中心：铃铛 + 下拉面板（待审核 / 部门消息 / 更新） ============
+  (function () {
+    var wrap = document.getElementById("usBellWrap");
+    if (!wrap) return;
+
+    wrap.innerHTML =
+      '<button type="button" class="us-bell" id="usBell" aria-label="消息通知" title="消息通知">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' +
+      '</svg><span class="nb-dot" id="nbDot" hidden></span></button>' +
+      '<div class="notif-panel" id="notifPanel" hidden>' +
+      '<div class="np-head"><span class="np-title">消息通知</span>' +
+      '<button type="button" class="np-mark" id="npMarkAll">全部已读</button></div>' +
+      '<div class="np-tabs">' +
+      '<button type="button" class="np-tab" data-t="review">待审核<i class="np-cnt"></i></button>' +
+      '<button type="button" class="np-tab" data-t="dept">部门消息<i class="np-cnt"></i></button>' +
+      '<button type="button" class="np-tab" data-t="update">更新<i class="np-cnt"></i></button>' +
+      '</div>' +
+      '<div class="np-body" id="npBody"></div>' +
+      '</div>';
+
+    var bell = document.getElementById("usBell");
+    var panel = document.getElementById("notifPanel");
+    var body = document.getElementById("npBody");
+    var dot = document.getElementById("nbDot");
+    var tabs = Array.prototype.slice.call(panel.querySelectorAll(".np-tab"));
+    var cur = "review";
+    var data = { review: [], dept: [], update: [] };
+
+    // 类型 → [徽标字, 底色]
+    var KIND = {
+      reg: ["审", "var(--brand)"],
+      nick: ["审", "var(--brand)"],
+      cash: ["审", "var(--brand)"],
+      dntR: ["审", "var(--brand)"],
+      dnt: ["部", "var(--brand-deep)"],
+      nt: ["更", "var(--brand)"],
+      news: ["更", "var(--brand)"],
+      sys: ["新", "var(--brand-deep)"],
+    };
+
+    function collect() {
+      var groups = { review: [], dept: [], update: [] };
+      var s = null;
+      try { s = STORE.getSession(); } catch (e) {}
+      if (!s) return groups;
+      try {
+        if (STORE.isSuperAdmin(s.role)) {
+          STORE.pendingRegistrations().forEach(function (u) {
+            if (u.status !== "pending") return;
+            groups.review.push({
+              kind: "reg",
+              title: "新注册待审核",
+              desc: (u.role === "parent" ? "家长" : "访客") + " " + u.name + "（" + u.account + "）申请注册",
+              href: "admin.html", ts: u.registerTs,
+            });
+          });
+          STORE.pendingNicknames().forEach(function (u) {
+            groups.review.push({
+              kind: "nick",
+              title: "昵称修改待审核",
+              desc: u.name + " 申请将昵称改为「" + u.nickPending + "」",
+              href: "admin.html", ts: null,
+            });
+          });
+          STORE.getCashouts().forEach(function (c) {
+            if (c.status !== "pending") return;
+            groups.review.push({
+              kind: "cash",
+              title: "零花钱申请待审核",
+              desc: (c.studentName || "学生") + " 申请将 " + c.points + " 分兑换为 " + c.money + " 元",
+              href: "admin.html", ts: c.applyTs || c.ts,
+            });
+          });
+        }
+        // 部长：本部门待审核公告
+        STORE.getDeptNotices().forEach(function (n) {
+          if (n.status !== "pending") return;
+          if (!STORE.canApproveDept(n.dept)) return;
+          groups.review.push({
+            kind: "dntR",
+            title: "部门公告待审核",
+            desc: (STORE.DEPTS[n.dept] ? STORE.DEPTS[n.dept].name : n.dept) + "「" + n.title + "」待你审核",
+            href: "department.html?dept=" + n.dept, ts: n.createdTs,
+          });
+        });
+      } catch (e) {}
+      // 部门消息：未读部门弹窗公告
+      var unread = [];
+      try { unread = STORE.unreadDeptNotices(); } catch (e) {}
+      unread.forEach(function (n) {
+        groups.dept.push({
+          kind: "dnt", id: n.id,
+          title: (STORE.DEPTS[n.dept] ? STORE.DEPTS[n.dept].name : n.dept) + " · " + n.title,
+          desc: (n.content || "").slice(0, 60),
+          href: "department.html?dept=" + n.dept, ts: n.createdTs,
+        });
+      });
+      // 更新：网站数据更新 + 最新公告 + 最新新闻
+      try {
+        var meta = STORE.getMeta();
+        if (meta && meta.lastUpdate) {
+          groups.update.push({
+            kind: "sys",
+            title: "网站内容更新",
+            desc: (meta.lastOperator || "系统") + " 更新了网站内容",
+            href: "index.html", ts: meta.lastUpdate,
+          });
+        }
+        STORE.getNotices().slice(0, 4).forEach(function (n) {
+          groups.update.push({
+            kind: "nt",
+            title: "通知公告 · " + n.title,
+            desc: (n.content || "").slice(0, 60),
+            href: "notices.html", ts: n.ts,
+          });
+        });
+        STORE.getNews().slice(0, 4).forEach(function (n) {
+          groups.update.push({
+            kind: "news",
+            title: "班级新闻 · " + n.title,
+            desc: (n.content || "").slice(0, 60),
+            href: "news.html", ts: n.ts,
+          });
+        });
+      } catch (e) {}
+      return groups;
+    }
+
+    function itemHtml(it) {
+      var k = KIND[it.kind] || ["·", "var(--brand)"];
+      var time = "";
+      try { time = STORE.fmtTime(it.ts); } catch (e) {}
+      return '<a class="np-item" href="' + quEsc(it.href) + '">' +
+        '<span class="npi-ic" style="background:' + k[1] + '">' + k[0] + '</span>' +
+        '<span class="npi-main"><span class="npi-t">' + esc(it.title) + '</span>' +
+        '<span class="npi-d">' + esc(it.desc) + '</span></span>' +
+        '<span class="npi-ts">' + esc(time) + '</span>' +
+        '</a>';
+    }
+
+    function render() {
+      data = collect();
+      var list = data[cur] || [];
+      body.innerHTML = list.length
+        ? list.map(itemHtml).join("")
+        : '<div class="np-empty">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></svg>' +
+          '这里空空如也</div>';
+      tabs.forEach(function (t) {
+        var key = t.getAttribute("data-t");
+        if (key === "update") return; // 更新是信息流，不显示计数
+        var n = (data[key] || []).length;
+        var c = t.querySelector(".np-cnt");
+        if (c) { if (n > 0) { c.textContent = n; c.classList.add("show"); } else { c.classList.remove("show"); } }
+      });
+      // 铃铛红点：待审核 + 未读部门消息
+      var n = data.review.length + data.dept.length;
+      if (n > 0) { dot.textContent = n > 99 ? "99+" : String(n); dot.hidden = false; }
+      else dot.hidden = true;
+    }
+
+    function toggle(open) {
+      if (open === undefined) open = panel.hidden;
+      if (open) {
+        render();
+        panel.hidden = false;
+        bell.classList.add("open");
+        // 打开面板即视为已读部门消息
+        var ids = data.dept.map(function (it) { return it.id; }).filter(Boolean);
+        if (ids.length) {
+          try { STORE.markDeptNoticeRead(ids); } catch (e) {}
+        }
+      } else {
+        panel.hidden = true;
+        bell.classList.remove("open");
+      }
+    }
+
+    bell.addEventListener("click", function (e) {
+      e.stopPropagation();
+      toggle();
+    });
+
+    tabs.forEach(function (t) {
+      t.addEventListener("click", function () {
+        cur = t.getAttribute("data-t");
+        tabs.forEach(function (x) { x.classList.toggle("on", x === t); });
+        render();
+      });
+    });
+
+    document.getElementById("npMarkAll").addEventListener("click", function () {
+      var ids = (data.dept || []).map(function (it) { return it.id; }).filter(Boolean);
+      if (ids.length) { try { STORE.markDeptNoticeRead(ids); } catch (e) {} }
+      render();
+    });
+
+    document.addEventListener("click", function (e) {
+      if (!panel.hidden && !wrap.contains(e.target)) toggle(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") toggle(false);
+    });
+
+    render(); // 初始渲染：红点 / 标签数即时生效
+    // 供其它模块（如登录后部门公告弹窗）关闭后刷新铃铛
+    try { window.__xhNotifRefresh = render; } catch (e) {}
+  })();
 
   // ============ 登录后弹窗展示未读部门公告 ============
   (function () {
@@ -133,11 +344,13 @@
     if (btn) btn.addEventListener("click", function () {
       try { STORE.markDeptNoticeRead(ids); } catch (e) {}
       if (mask.parentNode) mask.parentNode.removeChild(mask);
+      try { if (window.__xhNotifRefresh) window.__xhNotifRefresh(); } catch (e) {}
     });
     mask.addEventListener("click", function (e) {
       if (e.target === mask) {
         try { STORE.markDeptNoticeRead(ids); } catch (e) {}
         if (mask.parentNode) mask.parentNode.removeChild(mask);
+        try { if (window.__xhNotifRefresh) window.__xhNotifRefresh(); } catch (e) {}
       }
     });
   })();
