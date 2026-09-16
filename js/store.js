@@ -878,10 +878,12 @@ const STORE = (function () {
           nickname: d.user.nickname, avatar: d.user.avatar, mustChange: !!d.user.mustChange,
         };
         lsSet(KEY.session, session);
-        pushDocs(); // 推送本会话内积攒的本地改动
-        try { await resyncDocs(); } catch (e) {} // 拉取最新全量数据（含审核后的 status）
-        try { refreshSession(); } catch (e) {}   // 用最新用户数据刷新昵称/头像
+        pushDocs(); // 推送本会话内积攒的本地改动（非阻塞）
+        try { refreshSession(); } catch (e) {}   // 用本地已有数据刷新昵称/头像
         logAction("登录", "账号 " + account + " 登录成功");
+        // 后台异步拉取最新全量数据，不阻塞登录返回
+        // 登录响应已含 id/name/role/nickname/avatar，足够渲染 UI
+        resyncDocs().then(function () { try { refreshSession(); } catch (e) {} }).catch(function () {});
         return { ok: true, user: session };
       } catch (e) {
         return { ok: false, msg: "网络异常，请稍后重试" };
